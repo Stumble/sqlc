@@ -1,0 +1,58 @@
+{
+  "version": "2",
+  "plugins": [
+    {
+      "name": "jsonb",
+      "process": {
+        "cmd": "sqlc-gen-json"
+      }
+    }
+  ],
+  "sql": [
+    {
+      "schema": "users/schema.sql",
+      "queries": "users/query.sql",
+      "engine": "postgresql",
+      "codegen": [
+        {
+          "out": "json/users",
+          "plugin": "jsonb",
+          "options": {
+            "indent": "  ",
+            "filename": "codegen.json"
+          }
+        }
+      ]
+    },
+    {
+      "schema": "items/schema.sql",
+      "queries": "items/query.sql",
+      "engine": "postgresql",
+      "codegen": [
+        {
+          "out": "json/items",
+          "plugin": "jsonb",
+          "options": {
+            "indent": "  ",
+            "filename": "codegen.json"
+          }
+        }
+      ]
+    },
+    {
+      "schema": ["orders/schema.sql", "items/schema.sql", "users/schema.sql"],
+      "queries": "orders/query.sql",
+      "engine": "postgresql",
+      "codegen": [
+        {
+          "out": "json/orders",
+          "plugin": "jsonb",
+          "options": {
+            "indent": "  ",
+            "filename": "codegen.json"
+          }
+        }
+      ]
+    },
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "version": "2",
+  "sql": [
+    {
+      "schema": "users/schema.sql",
+      "queries": "users/query.sql",
+      "engine": "postgresql",
+      "gen": {
+        "go": {
+          "sql_package": "pgx/v5",
+          "package": "users",
+          "out": "go/users"
+        }
+      }
+    },
+    {
+      "schema": "items/schema.sql",
+      "queries": "items/query.sql",
+      "engine": "postgresql",
+      "gen": {
+        "go": {
+          "sql_package": "pgx/v5",
+          "package": "items",
+          "out": "go/items"
+        }
+      }
+
+    },
+    {
+      "schema": ["orders/schema.sql", "items/schema.sql", "users/schema.sql"],
+      "queries": "orders/query.sql",
+      "engine": "postgresql",
+      "gen": {
+        "go": {
+          "sql_package": "pgx/v5",
+          "package": "orders",
+          "out": "go/orders"
+        }
+      }
+    },
+  ]
+}
