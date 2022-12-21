@@ -86,7 +86,7 @@ func pluginGoCode(s config.SQLGo) *plugin.GoCode {
 		EmitResultStructPointers:    s.EmitResultStructPointers,
 		EmitParamsStructPointers:    s.EmitParamsStructPointers,
 		EmitMethodsWithDbArgument:   s.EmitMethodsWithDBArgument,
-    EmitPointersForNullTypes:  s.EmitPointersForNullTypes,
+		EmitPointersForNullTypes:    s.EmitPointersForNullTypes,
 		EmitEnumValidMethod:         s.EmitEnumValidMethod,
 		EmitAllEnumValues:           s.EmitAllEnumValues,
 		JsonTagsCaseStyle:           s.JSONTagsCaseStyle,
@@ -223,6 +223,7 @@ func pluginQueries(r *compiler.Result) []*plugin.Query {
 			Params:          params,
 			Filename:        q.Filename,
 			InsertIntoTable: iit,
+			Options:         q.Options,
 		})
 	}
 	return out
