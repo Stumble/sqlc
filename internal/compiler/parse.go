@@ -67,12 +67,12 @@ func (c *Compiler) parseQuery(stmt ast.Node, src string, o opts.Parser) (*Query,
 	if err := validate.In(c.catalog, raw); err != nil {
 		return nil, err
 	}
-	name, cmd, err := metadata.Parse(strings.TrimSpace(rawSQL), c.parser.CommentSyntax())
+	queryConfig, err := metadata.Parse(strings.TrimSpace(rawSQL), c.parser.CommentSyntax())
 	if err != nil {
 		return nil, err
 	}
 	raw, namedParams, edits := rewrite.NamedParameters(c.conf.Engine, raw, numbers, dollar)
-	if err := validate.Cmd(raw.Stmt, name, cmd); err != nil {
+	if err := validate.Cmd(raw.Stmt, queryConfig.Name, queryConfig.Cmd); err != nil {
 		return nil, err
 	}
 	rvs := rangeVars(raw.Stmt)
@@ -124,9 +124,10 @@ func (c *Compiler) parseQuery(stmt ast.Node, src string, o opts.Parser) (*Query,
 		return nil, err
 	}
 	return &Query{
-		Cmd:             cmd,
+		Cmd:             queryConfig.Cmd,
 		Comments:        comments,
-		Name:            name,
+		Name:            queryConfig.Name,
+		Options:         queryConfig.Options,
 		Params:          params,
 		Columns:         cols,
 		SQL:             trimmed,
