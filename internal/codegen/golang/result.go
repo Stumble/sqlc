@@ -9,7 +9,19 @@ import (
 	"github.com/sqlc-dev/sqlc/internal/inflection"
 	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
+
+	"golang.org/x/exp/constraints"
 )
+
+var (
+	reservedNames = make(map[string]bool)
+)
+
+func init() {
+	reservedNames["load"] = true
+	reservedNames["dump"] = true
+	reservedNames["check"] = true
+}
 
 func buildEnums(req *plugin.CodeGenRequest) []Enum {
 	var enums []Enum
@@ -65,6 +77,11 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 			continue
 		}
 		for _, table := range schema.Tables {
+			// only the last table schema, which is the first table creation SQL in sqlc.yaml file
+			// in the `schema: []` array, will be generated.
+			if !table.GenerateModel {
+				continue
+			}
 			var tableName string
 			if schema.Name == req.Catalog.DefaultSchema {
 				tableName = table.Rel.Name
@@ -88,12 +105,12 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				if req.Settings.Go.EmitDbTags {
 					tags["db"] = column.Name
 				}
-				if req.Settings.Go.EmitJsonTags {
-					tags["json"] = JSONTagName(column.Name, req.Settings)
-				}
+				// forked version always emit JSON tag.
+				tags["json"] = JSONTagName(column.Name, req.Settings)
 				addExtraGoStructTags(tags, req, column)
 				s.Fields = append(s.Fields, Field{
 					Name:    StructName(column.Name, req.Settings),
+					DBName:  column.Name,
 					Type:    goType(req, column),
 					Tags:    tags,
 					Comment: column.Comment,
@@ -101,9 +118,6 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 			}
 			structs = append(structs, s)
 		}
-	}
-	if len(structs) > 0 {
-		sort.Slice(structs, func(i, j int) bool { return structs[i].Name < structs[j].Name })
 	}
 	return structs
 }
@@ -182,6 +196,10 @@ func argName(name string) string {
 }
 
 func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error) {
+	queryNames := make(map[string]bool)
+	for _, query := range req.Queries {
+		queryNames[query.Name] = true
+	}
 	qs := make([]Query, 0, len(req.Queries))
 	for _, query := range req.Queries {
 		if query.Name == "" {
@@ -189,6 +207,11 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 		}
 		if query.Cmd == "" {
 			continue
+		}
+
+		if reservedNames[strings.ToLower(query.Name)] {
+			return nil, fmt.Errorf(
+				"Query name %s is reserved word, please change it", query.Name)
 		}
 
 		var constantName string
@@ -201,6 +224,7 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 		gq := Query{
 			Cmd:          query.Cmd,
 			ConstantName: constantName,
+			Pkg:          req.Settings.Go.Package,
 			FieldName:    sdk.LowerTitle(query.Name) + "Stmt",
 			MethodName:   query.Name,
 			SourceName:   query.Filename,
@@ -306,11 +330,67 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 				EmitPointer: req.Settings.Go.EmitResultStructPointers,
 			}
 		}
-
+		var err error
+		gq.Option, err = parseOption(query.Options, queryNames)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse options for %s because %w", query.Name, err)
+		}
 		qs = append(qs, gq)
 	}
 	sort.Slice(qs, func(i, j int) bool { return qs[i].MethodName < qs[j].MethodName })
 	return qs, nil
+}
+
+func buildQueryInvalidates(queries []Query) error {
+	qmap := make(map[string]*Query)
+	for i := range queries {
+		qmap[queries[i].MethodName] = &queries[i]
+	}
+
+	for i := range queries {
+		mutation := &queries[i]
+		unamer := NewUniqueNamer()
+		for _, toInvalidateName := range mutation.Option.Invalidates {
+			query := qmap[toInvalidateName]
+			if query.Option.Cache <= 0 {
+				return fmt.Errorf("%s tries to invalidate %s, which is not cached",
+					mutation.MethodName, toInvalidateName)
+			}
+			methodName := sdk.LowerTitle(query.MethodName)
+			if query.Arg.isEmpty() {
+				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
+					Q:        query,
+					NoArg:    true,
+					CacheKey: genCacheKeyWithArgName(*query, ""), // string key
+				})
+			} else {
+				if query.Arg.IsTypePointer() {
+					err := fmt.Errorf(
+						"Although invalidate pointer-typed argument is supported (%s tries to invalidate %s) , the generated type will be **T",
+						mutation.MethodName, query.MethodName)
+					fmt.Printf("WARNING: %s\n", err)
+				}
+				argName := unamer.UniqueName(methodName)
+				// additional pointer will be added to invalidate query key,
+				// so when we generate cache key, add 1 additional deref.
+				derefArgName := fmt.Sprintf("(*%s)", argName)
+				cacheKey := genCacheKeyWithArgName(*query, derefArgName)
+				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
+					Q:        query,
+					ArgName:  argName,
+					CacheKey: cacheKey,
+				})
+			}
+		}
+	}
+	return nil
+}
+
+func buildDumpLoader(structs []Struct) (*DumpLoader, error) {
+	if len(structs) == 0 {
+		return nil, fmt.Errorf("Cannot find main struct")
+	}
+	return &DumpLoader{MainStruct: &structs[0]}, nil
 }
 
 func putOutColumns(query *plugin.Query) bool {
@@ -429,4 +509,32 @@ func checkIncompatibleFieldTypes(fields []Field) error {
 		}
 	}
 	return nil
+}
+
+func max[T constraints.Ordered](s []T) T {
+	if len(s) == 0 {
+		var zero T
+		return zero
+	}
+	m := s[0]
+	for _, v := range s {
+		if m < v {
+			m = v
+		}
+	}
+	return m
+}
+
+func min[T constraints.Ordered](s []T) T {
+	if len(s) == 0 {
+		var zero T
+		return zero
+	}
+	m := s[0]
+	for _, v := range s {
+		if m > v {
+			m = v
+		}
+	}
+	return m
 }

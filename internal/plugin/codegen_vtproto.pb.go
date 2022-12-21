@@ -252,6 +252,11 @@ func (m *Catalog) CloneVT() *Catalog {
 		}
 		r.Schemas = tmpContainer
 	}
+	if rhs := m.RawSqls; rhs != nil {
+		tmpContainer := make([]string, len(rhs))
+		copy(tmpContainer, rhs)
+		r.RawSqls = tmpContainer
+	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -351,8 +356,9 @@ func (m *Table) CloneVT() *Table {
 		return (*Table)(nil)
 	}
 	r := &Table{
-		Rel:     m.Rel.CloneVT(),
-		Comment: m.Comment,
+		Rel:           m.Rel.CloneVT(),
+		Comment:       m.Comment,
+		GenerateModel: m.GenerateModel,
 	}
 	if rhs := m.Columns; rhs != nil {
 		tmpContainer := make([]*Column, len(rhs))
@@ -454,6 +460,13 @@ func (m *Query) CloneVT() *Query {
 		tmpContainer := make([]string, len(rhs))
 		copy(tmpContainer, rhs)
 		r.Comments = tmpContainer
+	}
+	if rhs := m.Options; rhs != nil {
+		tmpContainer := make(map[string]string, len(rhs))
+		for k, v := range rhs {
+			tmpContainer[k] = v
+		}
+		r.Options = tmpContainer
 	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
@@ -905,6 +918,15 @@ func (this *Catalog) EqualVT(that *Catalog) bool {
 			}
 		}
 	}
+	if len(this.RawSqls) != len(that.RawSqls) {
+		return false
+	}
+	for i, vx := range this.RawSqls {
+		vy := that.RawSqls[i]
+		if vx != vy {
+			return false
+		}
+	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
@@ -1070,6 +1092,9 @@ func (this *Table) EqualVT(that *Table) bool {
 	if this.Comment != that.Comment {
 		return false
 	}
+	if this.GenerateModel != that.GenerateModel {
+		return false
+	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
@@ -1232,6 +1257,18 @@ func (this *Query) EqualVT(that *Query) bool {
 	}
 	if !this.InsertIntoTable.EqualVT(that.InsertIntoTable) {
 		return false
+	}
+	if len(this.Options) != len(that.Options) {
+		return false
+	}
+	for i, vx := range this.Options {
+		vy, ok := that.Options[i]
+		if !ok {
+			return false
+		}
+		if vx != vy {
+			return false
+		}
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
@@ -2129,6 +2166,15 @@ func (m *Catalog) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if len(m.RawSqls) > 0 {
+		for iNdEx := len(m.RawSqls) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.RawSqls[iNdEx])
+			copy(dAtA[i:], m.RawSqls[iNdEx])
+			i = encodeVarint(dAtA, i, uint64(len(m.RawSqls[iNdEx])))
+			i--
+			dAtA[i] = 0x2a
+		}
+	}
 	if len(m.Schemas) > 0 {
 		for iNdEx := len(m.Schemas) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.Schemas[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
@@ -2380,6 +2426,16 @@ func (m *Table) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.GenerateModel {
+		i--
+		if m.GenerateModel {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x20
 	}
 	if len(m.Comment) > 0 {
 		i -= len(m.Comment)
@@ -2668,6 +2724,25 @@ func (m *Query) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.Options) > 0 {
+		for k := range m.Options {
+			v := m.Options[k]
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
+			i = encodeVarint(dAtA, i, uint64(len(v)))
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarint(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarint(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x4a
+		}
 	}
 	if m.InsertIntoTable != nil {
 		size, err := m.InsertIntoTable.MarshalToSizedBufferVT(dAtA[:i])
@@ -3712,6 +3787,15 @@ func (m *Catalog) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if len(m.RawSqls) > 0 {
+		for iNdEx := len(m.RawSqls) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.RawSqls[iNdEx])
+			copy(dAtA[i:], m.RawSqls[iNdEx])
+			i = encodeVarint(dAtA, i, uint64(len(m.RawSqls[iNdEx])))
+			i--
+			dAtA[i] = 0x2a
+		}
+	}
 	if len(m.Schemas) > 0 {
 		for iNdEx := len(m.Schemas) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.Schemas[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
@@ -3963,6 +4047,16 @@ func (m *Table) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.GenerateModel {
+		i--
+		if m.GenerateModel {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x20
 	}
 	if len(m.Comment) > 0 {
 		i -= len(m.Comment)
@@ -4251,6 +4345,25 @@ func (m *Query) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.Options) > 0 {
+		for k := range m.Options {
+			v := m.Options[k]
+			baseI := i
+			i -= len(v)
+			copy(dAtA[i:], v)
+			i = encodeVarint(dAtA, i, uint64(len(v)))
+			i--
+			dAtA[i] = 0x12
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarint(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarint(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x4a
+		}
 	}
 	if m.InsertIntoTable != nil {
 		size, err := m.InsertIntoTable.MarshalToSizedBufferVTStrict(dAtA[:i])
@@ -4817,6 +4930,12 @@ func (m *Catalog) SizeVT() (n int) {
 			n += 1 + l + sov(uint64(l))
 		}
 	}
+	if len(m.RawSqls) > 0 {
+		for _, s := range m.RawSqls {
+			l = len(s)
+			n += 1 + l + sov(uint64(l))
+		}
+	}
 	n += len(m.unknownFields)
 	return n
 }
@@ -4918,6 +5037,9 @@ func (m *Table) SizeVT() (n int) {
 	l = len(m.Comment)
 	if l > 0 {
 		n += 1 + l + sov(uint64(l))
+	}
+	if m.GenerateModel {
+		n += 2
 	}
 	n += len(m.unknownFields)
 	return n
@@ -5054,6 +5176,14 @@ func (m *Query) SizeVT() (n int) {
 	if m.InsertIntoTable != nil {
 		l = m.InsertIntoTable.SizeVT()
 		n += 1 + l + sov(uint64(l))
+	}
+	if len(m.Options) > 0 {
+		for k, v := range m.Options {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sov(uint64(len(k))) + 1 + len(v) + sov(uint64(len(v)))
+			n += mapEntrySize + 1 + sov(uint64(mapEntrySize))
+		}
 	}
 	n += len(m.unknownFields)
 	return n
@@ -7458,6 +7588,38 @@ func (m *Catalog) UnmarshalVT(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RawSqls", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RawSqls = append(m.RawSqls, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])
@@ -8090,6 +8252,26 @@ func (m *Table) UnmarshalVT(dAtA []byte) error {
 			}
 			m.Comment = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GenerateModel", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.GenerateModel = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])
@@ -9028,6 +9210,133 @@ func (m *Query) UnmarshalVT(dAtA []byte) error {
 			if err := m.InsertIntoTable.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Options", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Options == nil {
+				m.Options = make(map[string]string)
+			}
+			var mapkey string
+			var mapvalue string
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflow
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflow
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLength
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLength
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var stringLenmapvalue uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflow
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapvalue |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapvalue := int(stringLenmapvalue)
+					if intStringLenmapvalue < 0 {
+						return ErrInvalidLength
+					}
+					postStringIndexmapvalue := iNdEx + intStringLenmapvalue
+					if postStringIndexmapvalue < 0 {
+						return ErrInvalidLength
+					}
+					if postStringIndexmapvalue > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = string(dAtA[iNdEx:postStringIndexmapvalue])
+					iNdEx = postStringIndexmapvalue
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skip(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLength
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Options[mapkey] = mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

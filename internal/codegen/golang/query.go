@@ -72,6 +72,10 @@ func (v QueryValue) Type() string {
 	panic("no type for QueryValue: " + v.Name)
 }
 
+func (v QueryValue) IsTypePointer() bool {
+	return !v.isEmpty() && strings.HasPrefix(v.Type(), "*")
+}
+
 func (v *QueryValue) DefineType() string {
 	t := v.Type()
 	if v.IsPointer() {
@@ -171,7 +175,7 @@ func (v QueryValue) Scan() string {
 		if strings.HasPrefix(v.Typ, "[]") && v.Typ != "[]byte" && !v.SQLDriver.IsPGX() {
 			out = append(out, "pq.Array(&"+v.Name+")")
 		} else {
-			out = append(out, "&"+v.Name)
+			out = append(out, v.Name)
 		}
 	} else {
 		for _, f := range v.Struct.Fields {
@@ -225,10 +229,34 @@ func (v QueryValue) VariableForField(f Field) string {
 	return v.Name + "." + f.Name
 }
 
+// CacheKeySprintf is used by WPgx only.
+func (v QueryValue) CacheKeySprintf() string {
+	if v.Struct == nil {
+		panic(fmt.Errorf("trying to construct sprintf format for non-struct query arg: %+v", v))
+	}
+	format := make([]string, 0)
+	args := make([]string, 0)
+	for _, f := range v.Struct.Fields {
+		format = append(format, "%+v")
+		if strings.HasPrefix(f.Type, "*") {
+			args = append(args, wrapPtrStr(v.Name+"."+f.Name))
+		} else {
+			args = append(args, v.Name+"."+f.Name)
+		}
+	}
+	formatStr := `"` + strings.Join(format, ",") + `"`
+	if len(args) <= 3 {
+		return formatStr + ", " + strings.Join(args, ",")
+	}
+	args = append(args, "")
+	return formatStr + ",\n" + strings.Join(args, ",\n")
+}
+
 // A struct used to generate methods and fields on the Queries struct
 type Query struct {
 	Cmd          string
 	Comments     []string
+	Pkg          string
 	MethodName   string
 	FieldName    string
 	ConstantName string
@@ -236,6 +264,8 @@ type Query struct {
 	SourceName   string
 	Ret          QueryValue
 	Arg          QueryValue
+	Option       WPgxOption
+	Invalidates  []InvalidateParam
 	// Used for :copyfrom
 	Table *plugin.Identifier
 }
@@ -264,4 +294,66 @@ func (q Query) TableIdentifierForMySQL() string {
 		}
 	}
 	return strings.Join(escapedNames, ".")
+}
+
+// CacheKey is used by WPgx only.
+func (q Query) CacheKey() string {
+	return genCacheKeyWithArgName(q, q.Arg.Name)
+}
+
+// InvalidateArgs is used by WPgx only.
+func (q Query) InvalidateArgs() string {
+	rv := ""
+	if !q.Arg.isEmpty() {
+		rv = ", "
+	}
+	for _, inv := range q.Invalidates {
+		if inv.NoArg {
+			continue
+		}
+		t := "*" + inv.Q.Arg.Type()
+		rv += fmt.Sprintf("%s %s,", inv.ArgName, t)
+	}
+	return rv
+}
+
+// UniqueLabel is used by WPgx only.
+func (q Query) UniqueLabel() string {
+	return fmt.Sprintf("%s.%s", q.Pkg, q.MethodName)
+}
+
+// CacheUniqueLabel is used by WPgx only.
+func (q Query) CacheUniqueLabel() string {
+	return fmt.Sprintf("%s:%s:", q.Pkg, q.MethodName)
+}
+
+func genCacheKeyWithArgName(q Query, argName string) string {
+	if len(q.Pkg) == 0 {
+		panic("empty pkg name is invalid")
+	}
+	prefix := q.CacheUniqueLabel()
+	if q.Arg.isEmpty() {
+		return `"` + prefix + `"`
+	}
+	// when it's non-struct parameter, generate inline fmt.Sprintf.
+	if q.Arg.Struct == nil {
+		if q.Arg.IsTypePointer() {
+			argName = wrapPtrStr(argName)
+		}
+		fmtStr := `hashIfLong(fmt.Sprintf("%+v",` + argName + `))`
+		return fmt.Sprintf("\"%s\" + %s", prefix, fmtStr)
+	} else {
+		return argName + `.CacheKey()`
+	}
+}
+
+func wrapPtrStr(v string) string {
+	return fmt.Sprintf("ptrStr(%s)", v)
+}
+
+type InvalidateParam struct {
+	Q        *Query
+	NoArg    bool
+	ArgName  string
+	CacheKey string
 }

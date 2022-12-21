@@ -108,6 +108,7 @@ message Catalog {
   string default_schema = 2;
   string name = 3;
   repeated Schema schemas = 4;
+  repeated string raw_sqls = 5;
 }
 
 message Schema {
@@ -132,7 +133,8 @@ message Enum {
 message Table {
   Identifier rel = 1;
   repeated Column columns = 2;
-  string comment = 3;
+  string comment  = 3;
+  bool generate_model = 4;
 }
 
 message Identifier {
@@ -171,6 +173,7 @@ message Query {
   repeated string comments = 6 [json_name = "comments"];
   string filename = 7 [json_name = "filename"];
   Identifier insert_into_table = 8 [json_name = "insert_into_table"];
+  map<string, string> options = 9 [json_name="options"];
 }
 
 message Parameter {

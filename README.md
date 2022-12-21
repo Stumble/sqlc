@@ -1,3 +1,6 @@
+# Guide to this wicked fork
+This is a wicked fork of sqlc. Please see the guide [here](GUIDE.md).
+
 # sqlc: A SQL Compiler
 
 ![go](https://github.com/sqlc-dev/sqlc/workflows/go/badge.svg)

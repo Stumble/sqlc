@@ -44,6 +44,7 @@ type Query struct {
 	Name     string
 	Cmd      string // TODO: Pick a better name. One of: one, many, exec, execrows, copyFrom
 	Flags    map[string]bool
+	Options  map[string]string // key value pairs of extra options.
 	Columns  []*Column
 	Params   []Parameter
 	Comments []string
