@@ -223,6 +223,7 @@ func pluginQueries(r *compiler.Result) []*plugin.Query {
 			Params:          params,
 			Filename:        q.Filename,
 			InsertIntoTable: iit,
+			Options:         q.Options,
 		})
 	}
 	return out
