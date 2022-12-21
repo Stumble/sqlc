@@ -41,7 +41,8 @@ type Column struct {
 type Query struct {
 	SQL      string
 	Name     string
-	Cmd      string // TODO: Pick a better name. One of: one, many, exec, execrows, copyFrom
+	Cmd      string            // TODO: Pick a better name. One of: one, many, exec, execrows, copyFrom
+	Options  map[string]string // key value pairs of extra options.
 	Columns  []*Column
 	Params   []Parameter
 	Comments []string

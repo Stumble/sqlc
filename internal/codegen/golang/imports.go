@@ -114,6 +114,7 @@ func (i *importer) dbImports() fileImports {
 	var pkg []ImportSpec
 	std := []ImportSpec{
 		{Path: "context"},
+		{Path: "time"},
 	}
 
 	sqlpkg := parseDriver(i.Settings.Go.SqlPackage)
@@ -124,6 +125,10 @@ func (i *importer) dbImports() fileImports {
 	case SQLDriverPGXV5:
 		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"})
 		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5"})
+	case SQLDriverWPGX:
+		std = []ImportSpec{}
+		pkg = append(pkg, ImportSpec{Path: "github.com/stumble/wpgx"})
+		pkg = append(pkg, ImportSpec{Path: "github.com/stumble/dcache"})
 	default:
 		std = append(std, ImportSpec{Path: "database/sql"})
 		if i.Settings.Go.EmitPreparedQueries {
@@ -168,9 +173,15 @@ func buildImports(settings *plugin.Settings, queries []Query, uses func(string) 
 				pkg[ImportSpec{Path: "github.com/jackc/pgconn"}] = struct{}{}
 			case SQLDriverPGXV5:
 				pkg[ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"}] = struct{}{}
+			case SQLDriverWPGX:
+				pkg[ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"}] = struct{}{}
 			default:
 				std["database/sql"] = struct{}{}
 			}
+		}
+
+		if q.Cmd == metadata.CmdOne && sqlpkg == SQLDriverWPGX {
+			pkg[ImportSpec{Path: "github.com/jackc/pgx/v5"}] = struct{}{}
 		}
 	}
 
@@ -181,7 +192,7 @@ func buildImports(settings *plugin.Settings, queries []Query, uses func(string) 
 	}
 
 	if uses("pgtype.") {
-		if sqlpkg == SQLDriverPGXV5 {
+		if sqlpkg == SQLDriverPGXV5 || sqlpkg == SQLDriverWPGX {
 			pkg[ImportSpec{Path: "github.com/jackc/pgx/v5/pgtype"}] = struct{}{}
 		} else {
 			pkg[ImportSpec{Path: "github.com/jackc/pgtype"}] = struct{}{}
@@ -370,6 +381,11 @@ func (i *importer) queryImports(filename string) fileImports {
 
 	if anyNonCopyFrom {
 		std["context"] = struct{}{}
+		std["time"] = struct{}{}
+		std["fmt"] = struct{}{}
+		std["encoding/json"] = struct{}{}
+		std["crypto/sha256"] = struct{}{}
+		std["encoding/hex"] = struct{}{}
 	}
 
 	sqlpkg := parseDriver(i.Settings.Go.SqlPackage)
@@ -378,6 +394,10 @@ func (i *importer) queryImports(filename string) fileImports {
 	}
 	if sliceScan() && !sqlpkg.IsPGX() {
 		pkg[ImportSpec{Path: "github.com/lib/pq"}] = struct{}{}
+	}
+
+	if sqlpkg == SQLDriverWPGX {
+		pkg[ImportSpec{Path: "github.com/rs/zerolog/log"}] = struct{}{}
 	}
 
 	return sortedImports(std, pkg)
@@ -456,6 +476,8 @@ func (i *importer) batchImports() fileImports {
 		pkg[ImportSpec{Path: "github.com/jackc/pgx/v4"}] = struct{}{}
 	case SQLDriverPGXV5:
 		pkg[ImportSpec{Path: "github.com/jackc/pgx/v5"}] = struct{}{}
+	case SQLDriverWPGX:
+		pkg[ImportSpec{Path: "github.com/stumble/wpgx"}] = struct{}{}
 	}
 
 	return sortedImports(std, pkg)

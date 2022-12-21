@@ -1,36 +1,40 @@
+CGO_ENABLED = 1
+COMMIT_HASH := $(shell git --no-pager describe --tags --always --dirty)
+LDFLAGS = "-X github.com/kyleconroy/sqlc/internal/info.Version=$(COMMIT_HASH)-wicked-fork"
+
 .PHONY: build build-endtoend test test-ci test-examples test-endtoend regen start psql mysqlsh proto
 
 build:
-	go build ./...
+	CGO_ENABLED=$(CGO_ENABLED) go build -ldflags=$(LDFLAGS) -o bin/ ./cmd/...
 
 install:
-	go install ./...
+	CGO_ENABLED=$(CGO_ENABLED) go install -ldflags=$(LDFLAGS) ./cmd/...
 
 test:
-	go test ./...
+	CGO_ENABLED=$(CGO_ENABLED) go test ./...
 
 vet:
-	go vet ./...
+	CGO_ENABLED=$(CGO_ENABLED) go vet ./...
 
 test-examples:
-	go test --tags=examples ./...
+	CGO_ENABLED=$(CGO_ENABLED) go test --tags=examples ./...
 
 build-endtoend:
-	cd ./internal/endtoend/testdata && go build ./...
+	cd ./internal/endtoend/testdata && CGO_ENABLED=$(CGO_ENABLED) go build ./...
 
 test-ci: test-examples build-endtoend vet
 
 regen: sqlc-dev sqlc-gen-json
-	go run ./scripts/regenerate/
+	CGO_ENABLED=$(CGO_ENABLED) go run ./scripts/regenerate/
 
 sqlc-dev:
-	go build -o ~/bin/sqlc-dev ./cmd/sqlc/
+	CGO_ENABLED=$(CGO_ENABLED) go build -o ~/bin/sqlc-dev ./cmd/sqlc/
 
 sqlc-pg-gen:
-	go build -o ~/bin/sqlc-pg-gen ./internal/tools/sqlc-pg-gen
+	CGO_ENABLED=$(CGO_ENABLED) go build -o ~/bin/sqlc-pg-gen ./internal/tools/sqlc-pg-gen
 
 sqlc-gen-json:
-	go build -o ~/bin/sqlc-gen-json ./cmd/sqlc-gen-json
+	CGO_ENABLED=$(CGO_ENABLED) go build -o ~/bin/sqlc-gen-json ./cmd/sqlc-gen-json
 
 start:
 	docker-compose up -d
