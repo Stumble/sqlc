@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 
+	"github.com/sqlc-dev/sqlc/internal/codegen/golang"
 	"github.com/sqlc-dev/sqlc/internal/config"
 	"github.com/sqlc-dev/sqlc/internal/debug"
 	"github.com/sqlc-dev/sqlc/internal/info"
@@ -158,6 +159,11 @@ func (e *Env) Validate(cfg *config.Config) error {
 	for _, plugin := range cfg.Plugins {
 		if plugin.Process != nil && !e.Debug.ProcessPlugins {
 			return ErrPluginProcessDisabled
+		}
+	}
+	for _, sql := range cfg.SQL {
+		if sql.Gen.Go != nil && sql.Gen.Go.SQLPackage != golang.SQLPackageWPGX {
+			return fmt.Errorf("This forked version of sqlc only support WPGX as sql package")
 		}
 	}
 	return nil

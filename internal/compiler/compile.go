@@ -31,7 +31,9 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 		return err
 	}
 	merr := multierr.New()
-	for _, filename := range files {
+	// XXX(yumin): reverse the order of files to process dependencies first.
+	orderReversedFiles := reversed(files)
+	for i, filename := range orderReversedFiles {
 		blob, err := os.ReadFile(filename)
 		if err != nil {
 			merr.Add(filename, "", 0, err)
@@ -43,11 +45,25 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 			merr.Add(filename, contents, 0, err)
 			continue
 		}
-		for i := range stmts {
-			if err := c.catalog.Update(stmts[i], c); err != nil {
-				merr.Add(filename, contents, stmts[i].Pos(), err)
+		tableDefined := false
+		for _, stmt := range stmts {
+			// XXX(yumin): generate table only when it's the originally the first table
+			// creation of the first file in the first schema array.
+			if err := c.catalog.Update(
+				stmt, c, !tableDefined && i == len(orderReversedFiles)-1); err != nil {
+				merr.Add(filename, contents, stmt.Pos(), err)
 				continue
 			}
+			definingTable := c.catalog.IsCreatingNewTableLayout(stmt)
+			if tableDefined && definingTable {
+				merr.Add(filename, contents, stmt.Pos(),
+					fmt.Errorf("only one table creation is allowed per schema.sql file"))
+			}
+			tableDefined = tableDefined || definingTable
+		}
+		// XXX(yumin): only the first schema file in the original order is added.
+		if i == len(orderReversedFiles)-1 {
+			c.catalog.AddRawSQL(contents)
 		}
 	}
 	if len(merr.Errs()) > 0 {
@@ -113,4 +129,12 @@ func (c *Compiler) parseQueries(o opts.Parser) (*Result, error) {
 		Catalog: c.catalog,
 		Queries: q,
 	}, nil
+}
+
+func reversed[V any](arr []V) []V {
+	rv := make([]V, len(arr))
+	for i := range arr {
+		rv[len(arr)-1-i] = arr[i]
+	}
+	return rv
 }

@@ -188,8 +188,9 @@ func pluginCatalog(c *catalog.Catalog) *plugin.Catalog {
 					Schema:  t.Rel.Schema,
 					Name:    t.Rel.Name,
 				},
-				Columns: columns,
-				Comment: t.Comment,
+				Columns:       columns,
+				Comment:       t.Comment,
+				GenerateModel: t.GenerateModel,
 			})
 		}
 		schemas = append(schemas, &plugin.Schema{
@@ -205,6 +206,7 @@ func pluginCatalog(c *catalog.Catalog) *plugin.Catalog {
 		DefaultSchema: c.DefaultSchema,
 		Comment:       c.Comment,
 		Schemas:       schemas,
+		RawSqls:       c.RawSQLs,
 	}
 }
 
@@ -236,6 +238,7 @@ func pluginQueries(r *compiler.Result) []*plugin.Query {
 			Params:          params,
 			Filename:        q.Filename,
 			InsertIntoTable: iit,
+			Options:         q.Options,
 		})
 	}
 	return out

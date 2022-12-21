@@ -16,13 +16,15 @@ import (
 )
 
 type tmplCtx struct {
-	Q           string
-	Package     string
-	SQLDriver   SQLDriver
-	Enums       []Enum
-	Structs     []Struct
-	GoQueries   []Query
-	SqlcVersion string
+	Q            string
+	Package      string
+	SQLDriver    SQLDriver
+	Enums        []Enum
+	Structs      []Struct
+	GoQueries    []Query
+	SqlcVersion  string
+	DumpLoader   *DumpLoader
+	RawSchemaSQL string
 
 	// TODO: Race conditions
 	SourceName string
@@ -108,11 +110,13 @@ func Generate(ctx context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenR
 	if err != nil {
 		return nil, err
 	}
-
 	if req.Settings.Go.OmitUnusedStructs {
 		enums, structs = filterUnusedStructs(enums, structs, queries)
 	}
-
+	err = buildQueryInvalidates(queries)
+	if err != nil {
+		return nil, err
+	}
 	return generate(req, enums, structs, queries)
 }
 
@@ -125,16 +129,20 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 	}
 
 	golang := req.Settings.Go
+	dumploader, err := buildDumpLoader(structs)
+	if err != nil {
+		return nil, err
+	}
 	tctx := tmplCtx{
-		EmitInterface:             golang.EmitInterface,
-		EmitJSONTags:              golang.EmitJsonTags,
-		JsonTagsIDUppercase:       golang.JsonTagsIdUppercase,
-		EmitDBTags:                golang.EmitDbTags,
-		EmitPreparedQueries:       golang.EmitPreparedQueries,
-		EmitEmptySlices:           golang.EmitEmptySlices,
-		EmitMethodsWithDBArgument: golang.EmitMethodsWithDbArgument,
-		EmitEnumValidMethod:       golang.EmitEnumValidMethod,
-		EmitAllEnumValues:         golang.EmitAllEnumValues,
+		EmitInterface:             false,
+		EmitJSONTags:              true,
+		JsonTagsIDUppercase:       false,
+		EmitDBTags:                false,
+		EmitPreparedQueries:       false,
+		EmitEmptySlices:           false,
+		EmitMethodsWithDBArgument: false,
+		EmitEnumValidMethod:       true,
+		EmitAllEnumValues:         true,
 		UsesCopyFrom:              usesCopyFrom(queries),
 		UsesBatch:                 usesBatch(queries),
 		SQLDriver:                 parseDriver(golang.SqlPackage),
@@ -143,6 +151,8 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 		Enums:                     enums,
 		Structs:                   structs,
 		SqlcVersion:               req.SqlcVersion,
+		DumpLoader:                dumploader,
+		RawSchemaSQL:              strings.Join(req.Catalog.GetRawSqls(), "\n"),
 	}
 
 	if tctx.UsesCopyFrom && !tctx.SQLDriver.IsPGX() && golang.SqlDriver != SQLDriverGoSQLDriverMySQL {
