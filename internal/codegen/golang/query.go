@@ -3,7 +3,6 @@ package golang
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/kyleconroy/sqlc/internal/metadata"
 	"github.com/kyleconroy/sqlc/internal/plugin"
@@ -209,7 +208,7 @@ type Query struct {
 	SourceName    string
 	Ret           QueryValue
 	Arg           QueryValue
-	CacheDuration time.Duration
+	Option        WPgxOption
 	// Used for :copyfrom
 	Table *plugin.Identifier
 }
