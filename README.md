@@ -1,3 +1,29 @@
+# A wicked fork
+
+## Opinionated choices
+1. Use pgx/v5 types, if NULL-able.
+
+## Opinionated fixes (changes)
+1. Duplicated model for partitioned table:
+   Only one model, which is defined by the first table creation statement of the first
+   schema, will be generated into the model file.
+2. Need to preserve camel-styled names:
+   Well we cannot. Tokens were lower-cased in pg parser. To generate good-looking camel style
+   variable names for golang, if you are not using the recommended snake case in SQL, you will
+   need to use the `rename` feature. However, currently the rename option is not exposed to plugins.
+   Plus that there is no global rename option, which is not convenient.
+3. Not really doing type-checking on everything:
+   Although using type cast can help to generate correctly typed code, but we found that not
+   all SQL code are type-checked correctly. We might need to implement a new type check pass.
+
+## Cherry-picked fixes
+
+### Rename
+https://github.com/kyleconroy/sqlc/pull/2001
+
+### XXX
+https://github.com/kyleconroy/sqlc/pull/1996
+
 # sqlc: A SQL Compiler
 
 ![go](https://github.com/kyleconroy/sqlc/workflows/go/badge.svg)
