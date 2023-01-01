@@ -129,6 +129,41 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, e
 	return items, nil
 }
 
+const listSomeItems = `-- name: ListSomeItems :many
+SELECT id, name, description, category, price, thumbnail, metadata, createdat, updatedat FROM Items
+WHERE id = ANY($1::bigserial[])
+`
+
+func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error) {
+	rows, err := q.db.Query(ctx, listSomeItems, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Item
+	for rows.Next() {
+		var i Item
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Category,
+			&i.Price,
+			&i.Thumbnail,
+			&i.Metadata,
+			&i.Createdat,
+			&i.Updatedat,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchItems = `-- name: SearchItems :many
 SELECT id, name, description, category, price, thumbnail, metadata, createdat, updatedat FROM Items
 WHERE Name LIKE $1
