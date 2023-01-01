@@ -5,13 +5,13 @@
 package users
 
 import (
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
 )
 
 type User struct {
-	ID        int32
-	Name      string
-	Metadata  []byte
-	Thumbnail string
-	Createdat pgtype.Timestamp
+	ID        int32     `json:"id"`
+	Name      string    `json:"name"`
+	Metadata  []byte    `json:"metadata"`
+	Thumbnail string    `json:"thumbnail"`
+	Createdat time.Time `json:"createdat"`
 }

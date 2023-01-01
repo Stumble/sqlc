@@ -7,8 +7,9 @@ package items
 import (
 	"database/sql/driver"
 	"fmt"
+	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgtype"
 )
 
 type Itemcategory string
@@ -57,25 +58,13 @@ func (ns NullItemcategory) Value() (driver.Value, error) {
 }
 
 type Item struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Metadata    []byte
-	Createdat   pgtype.Timestamp
-	Updatedat   pgtype.Timestamp
-}
-
-type ItemsIDLe1000 struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Metadata    []byte
-	Createdat   pgtype.Timestamp
-	Updatedat   pgtype.Timestamp
+	ID          int64          `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Category    Itemcategory   `json:"category"`
+	Price       pgtype.Numeric `json:"price"`
+	Thumbnail   string         `json:"thumbnail"`
+	Metadata    []byte         `json:"metadata"`
+	Createdat   time.Time      `json:"createdat"`
+	Updatedat   time.Time      `json:"updatedat"`
 }
