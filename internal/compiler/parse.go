@@ -72,7 +72,8 @@ func (c *Compiler) parseQuery(stmt ast.Node, src string, o opts.Parser) (*Query,
 		return nil, err
 	}
 	raw, namedParams, edits := rewrite.NamedParameters(c.conf.Engine, raw, numbers, dollar)
-	if err := validate.Cmd(raw.Stmt, queryConfig.Name, queryConfig.Cmd); err != nil {
+	if err := validate.Cmd(
+		raw.Stmt, queryConfig.Name, queryConfig.Cmd, queryConfig.Options); err != nil {
 		return nil, err
 	}
 	rvs := rangeVars(raw.Stmt)

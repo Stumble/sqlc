@@ -26,6 +26,6 @@ INSERT INTO Items (
 RETURNING *;
 
 -- name: DeleteItem :exec
--- -- invalidate : [GetItemByID]
+-- -- invalidate : [GetItemByID, ListItems]
 DELETE FROM Items
 WHERE id = $1;
