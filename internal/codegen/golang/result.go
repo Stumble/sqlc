@@ -141,6 +141,10 @@ func argName(name string) string {
 }
 
 func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error) {
+	queryNames := make(map[string]bool)
+	for _, query := range req.Queries {
+		queryNames[query.Name] = true
+	}
 	qs := make([]Query, 0, len(req.Queries))
 	for _, query := range req.Queries {
 		if query.Name == "" {
@@ -255,7 +259,11 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 				EmitPointer: req.Settings.Go.EmitResultStructPointers,
 			}
 		}
-
+		var err error
+		gq.Option, err = parseOption(query.Options, queryNames)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse options for %s because %w", query.Name, err)
+		}
 		qs = append(qs, gq)
 	}
 	sort.Slice(qs, func(i, j int) bool { return qs[i].MethodName < qs[j].MethodName })
