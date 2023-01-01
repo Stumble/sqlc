@@ -3,6 +3,7 @@ package golang
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kyleconroy/sqlc/internal/metadata"
 	"github.com/kyleconroy/sqlc/internal/plugin"
@@ -199,15 +200,16 @@ func (v QueryValue) VariableForField(f Field) string {
 
 // A struct used to generate methods and fields on the Queries struct
 type Query struct {
-	Cmd          string
-	Comments     []string
-	MethodName   string
-	FieldName    string
-	ConstantName string
-	SQL          string
-	SourceName   string
-	Ret          QueryValue
-	Arg          QueryValue
+	Cmd           string
+	Comments      []string
+	MethodName    string
+	FieldName     string
+	ConstantName  string
+	SQL           string
+	SourceName    string
+	Ret           QueryValue
+	Arg           QueryValue
+	CacheDuration time.Duration
 	// Used for :copyfrom
 	Table *plugin.Identifier
 }

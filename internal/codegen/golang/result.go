@@ -2,6 +2,7 @@ package golang
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
@@ -59,6 +60,7 @@ func buildEnums(req *plugin.CodeGenRequest) []Enum {
 }
 
 func buildStructs(req *plugin.CodeGenRequest) []Struct {
+	haveBuiltOne := false
 	var structs []Struct
 	for _, schema := range req.Catalog.Schemas {
 		if schema.Name == "pg_catalog" || schema.Name == "information_schema" {
@@ -70,6 +72,11 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				tableName = table.Rel.Name
 			} else {
 				tableName = schema.Name + "_" + table.Rel.Name
+			}
+			if haveBuiltOne {
+				log.Printf(
+					"Forked version will only build the first struct, skipping: %s ", tableName)
+				continue
 			}
 			structName := tableName
 			if !req.Settings.Go.EmitExactTableNames {
@@ -88,9 +95,8 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				if req.Settings.Go.EmitDbTags {
 					tags["db"] = column.Name
 				}
-				if req.Settings.Go.EmitJsonTags {
-					tags["json"] = JSONTagName(column.Name, req.Settings)
-				}
+				// forked version always emit JSON tag.
+				tags["json"] = JSONTagName(column.Name, req.Settings)
 				addExtraGoStructTags(tags, req, column)
 				s.Fields = append(s.Fields, Field{
 					Name:    StructName(column.Name, req.Settings),
@@ -100,6 +106,7 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				})
 			}
 			structs = append(structs, s)
+			haveBuiltOne = true
 		}
 	}
 	if len(structs) > 0 {
