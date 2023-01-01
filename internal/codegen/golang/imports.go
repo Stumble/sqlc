@@ -125,8 +125,9 @@ func (i *importer) dbImports() fileImports {
 		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"})
 		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5"})
 	case SQLDriverWPGX:
-		pkg = append(pkg, ImportSpec{Path: "github.com/stumble/wpgx"})
 		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5"})
+		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"})
+		pkg = append(pkg, ImportSpec{Path: "github.com/stumble/wpgx"})
 	default:
 		std = append(std, ImportSpec{Path: "database/sql"})
 		if i.Settings.Go.EmitPreparedQueries {

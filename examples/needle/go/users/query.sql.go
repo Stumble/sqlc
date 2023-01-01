@@ -8,7 +8,7 @@ package users
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgtype"
 )
 
 const complicated = `-- name: Complicated :many

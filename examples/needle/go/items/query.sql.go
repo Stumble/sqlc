@@ -8,7 +8,7 @@ package items
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgtype"
 )
 
 const createItems = `-- name: CreateItems :one

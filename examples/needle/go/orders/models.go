@@ -7,8 +7,7 @@ package orders
 import (
 	"database/sql/driver"
 	"fmt"
-
-	"github.com/jackc/pgx/v5/pgtype"
+	"time"
 )
 
 type Itemcategory string
@@ -56,42 +55,10 @@ func (ns NullItemcategory) Value() (driver.Value, error) {
 	return ns.Itemcategory, nil
 }
 
-type Item struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Metadata    []byte
-	Createdat   pgtype.Timestamp
-	Updatedat   pgtype.Timestamp
-}
-
-type ItemsIDLe1000 struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Metadata    []byte
-	Createdat   pgtype.Timestamp
-	Updatedat   pgtype.Timestamp
-}
-
 type Order struct {
-	ID        int32
-	Userid    int32
-	Itemid    int32
-	Createdat pgtype.Timestamp
-	Isdeleted bool
-}
-
-type User struct {
-	ID        int32
-	Name      string
-	Metadata  []byte
-	Thumbnail string
-	Createdat pgtype.Timestamp
+	ID        int32     `json:"id"`
+	Userid    int32     `json:"userid"`
+	Itemid    int32     `json:"itemid"`
+	Createdat time.Time `json:"createdat"`
+	Isdeleted bool      `json:"isdeleted"`
 }

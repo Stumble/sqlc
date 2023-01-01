@@ -7,7 +7,7 @@
       "engine": "postgresql",
       "gen": {
         "go": {
-          "sql_package": "pgx/v5",
+          "sql_package": "wpgx",
           "package": "users",
           "out": "go/users"
         }
@@ -19,7 +19,7 @@
       "engine": "postgresql",
       "gen": {
         "go": {
-          "sql_package": "pgx/v5",
+          "sql_package": "wpgx",
           "package": "items",
           "out": "go/items"
         }
@@ -32,7 +32,7 @@
       "engine": "postgresql",
       "gen": {
         "go": {
-          "sql_package": "pgx/v5",
+          "sql_package": "wpgx",
           "package": "orders",
           "out": "go/orders"
         }
