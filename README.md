@@ -3,6 +3,7 @@
 ## Opinionated choices
 1. a set of rules mapping pg types to go types.
 2. always emit JSON tag.
+3. TODO: duplicated ENUM values, in every generated modle file.
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:
