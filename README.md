@@ -1,7 +1,8 @@
 # A wicked fork
 
 ## Opinionated choices
-1. Use pgx/v5 types, if NULL-able.
+1. a set of rules mapping pg types to go types.
+2. always emit JSON tag.
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:

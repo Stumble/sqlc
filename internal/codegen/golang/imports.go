@@ -125,6 +125,9 @@ func (i *importer) dbImports() fileImports {
 	case SQLDriverPGXV5:
 		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"})
 		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5"})
+	case SQLDriverWPGX:
+		pkg = append(pkg, ImportSpec{Path: "github.com/stumble/wpgx"})
+		pkg = append(pkg, ImportSpec{Path: "github.com/jackc/pgx/v5"})
 	default:
 		std = append(std, ImportSpec{Path: "database/sql"})
 		if i.Settings.Go.EmitPreparedQueries {
@@ -467,6 +470,8 @@ func (i *importer) batchImports() fileImports {
 		pkg[ImportSpec{Path: "github.com/jackc/pgx/v4"}] = struct{}{}
 	case SQLDriverPGXV5:
 		pkg[ImportSpec{Path: "github.com/jackc/pgx/v5"}] = struct{}{}
+	case SQLDriverWPGX:
+		pkg[ImportSpec{Path: "github.com/stumble/wpgx"}] = struct{}{}
 	}
 
 	return sortedImports(std, pkg)
