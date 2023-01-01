@@ -7,8 +7,9 @@ package orders
 
 import (
 	"context"
+	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgtype"
 )
 
 const createAuthor = `-- name: CreateAuthor :one
@@ -76,7 +77,7 @@ type GetOrderByIDRow struct {
 	ID            int32
 	Userid        int32
 	Itemid        int32
-	Createdat     pgtype.Timestamp
+	Createdat     time.Time
 	Username      string
 	Userthumbnail string
 	Itemname      string
@@ -160,7 +161,7 @@ LIMIT $3
 
 type ListOrdersByUserParams struct {
 	Userid int32
-	After  pgtype.Timestamp
+	After  time.Time
 	First  int32
 }
 
