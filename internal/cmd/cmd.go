@@ -121,8 +121,8 @@ func ParseEnv(c *cobra.Command) Env {
 
 func (e *Env) Validate(cfg *config.Config) error {
 	for _, sql := range cfg.SQL {
-		if sql.Gen.Go != nil && sql.Gen.Go.SQLPackage == golang.SQLPackagePGXV5 && !e.ExperimentalFeatures {
-			return fmt.Errorf("'pgx/v5' golang sql package requires enabled '--experimental' flag")
+		if sql.Gen.Go != nil && sql.Gen.Go.SQLPackage != golang.SQLPackageWPGX {
+			return fmt.Errorf("This forked version of sqlc only support WPGX as sql package")
 		}
 	}
 
