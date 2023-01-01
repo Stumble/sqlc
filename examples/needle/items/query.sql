@@ -13,6 +13,10 @@ WHERE id > @after
 ORDER BY id
 LIMIT @first;
 
+-- name: ListSomeItems :many
+SELECT * FROM Items
+WHERE id = ANY(@ids::bigserial[]);
+
 -- name: CreateItems :one
 INSERT INTO Items (
   Name, Description, Category, Price, Thumbnail, Metadata
