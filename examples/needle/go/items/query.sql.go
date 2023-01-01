@@ -58,7 +58,7 @@ DELETE FROM Items
 WHERE id = $1
 `
 
-// -- invalidate : [GetItemByID]
+// -- invalidate : [GetItemByID, ListItems]
 func (q *Queries) DeleteItem(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, deleteItem, id)
 	return err
