@@ -9,23 +9,28 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stumble/wpgx"
 )
 
-type DBTX interface {
-	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
-	QueryRow(context.Context, string, ...interface{}) pgx.Row
+type WGConn interface {
+	WQuery(
+		ctx context.Context, name string, unprepared string, args ...interface{}) (pgx.Rows, error)
+	WQueryRow(
+		ctx context.Context, name string, unprepared string, args ...interface{}) pgx.Row
+	WExec(
+		ctx context.Context, name string, unprepared string, args ...interface{}) (pgconn.CommandTag, error)
+	PostExec(f wpgx.PostExecFunc) error
 }
 
-func New(db DBTX) *Queries {
+func New(db WGConn) *Queries {
 	return &Queries{db: db}
 }
 
 type Queries struct {
-	db DBTX
+	db WGConn
 }
 
-func (q *Queries) WithTx(tx pgx.Tx) *Queries {
+func (q *Queries) WithTx(tx *wpgx.WTx) *Queries {
 	return &Queries{
 		db: tx,
 	}

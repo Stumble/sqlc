@@ -1,10 +1,13 @@
 {{define "dbCodeTemplateWPgx"}}
 
-// TODO change all here.
-type DBTX interface {
-	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
-	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
-	QueryRow(context.Context, string, ...interface{}) pgx.Row
+type WGConn interface {
+	WQuery(
+		ctx context.Context, name string, unprepared string, args ...interface{}) (pgx.Rows, error)
+	WQueryRow(
+		ctx context.Context, name string, unprepared string, args ...interface{}) pgx.Row
+	WExec(
+		ctx context.Context, name string, unprepared string, args ...interface{}) (pgconn.CommandTag, error)
+	PostExec(f wpgx.PostExecFunc) error
 {{- if .UsesCopyFrom }}
 	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 {{- end }}
@@ -17,19 +20,19 @@ type DBTX interface {
 func New() *Queries {
 	return &Queries{}
 {{- else -}}
-func New(db DBTX) *Queries {
+func New(db WGConn) *Queries {
 	return &Queries{db: db}
 {{- end}}
 }
 
 type Queries struct {
     {{if not .EmitMethodsWithDBArgument}}
-	db DBTX
+	db WGConn
     {{end}}
 }
 
 {{if not .EmitMethodsWithDBArgument}}
-func (q *Queries) WithTx(tx pgx.Tx) *Queries {
+func (q *Queries) WithTx(tx *wpgx.WTx) *Queries {
 	return &Queries{
 		db: tx,
 	}
