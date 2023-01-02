@@ -222,7 +222,6 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, e
 		return items.([]Item), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []Item
 	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
@@ -273,7 +272,6 @@ func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error
 		return items.([]Item), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []Item
 	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("ListSomeItems:%+v", ids), &items, dbRead, false, false)
 	if err != nil {
@@ -324,7 +322,6 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 		return items.([]Item), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []Item
 	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("SearchItems:%+v", name), &items, dbRead, false, false)
 	if err != nil {
