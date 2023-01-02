@@ -214,7 +214,6 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 		return items.([]Order), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []Order
 	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
@@ -276,7 +275,6 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 		return items.([]Order), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []Order
 	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
