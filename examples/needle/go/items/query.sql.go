@@ -46,9 +46,11 @@ func (arg CreateItemsParams) CacheKey() string {
 }
 
 func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item, error) {
+	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 0)
 		row := q.db.WQueryRow(ctx, "CreateItems", createItems,
+
 			arg.Name,
 			arg.Description,
 			arg.Category,
@@ -74,18 +76,17 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		v, _, err := dbRead()
-		return v.(*Item), err
+		rv, _, err := dbRead()
+		return rv.(*Item), err
 	}
 
-	// TODO(mustRevalidate, noStore)
-	var v *Item
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &v, dbRead, false, false)
+	var rv *Item
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return v, err
 
+	return rv, err
 }
 
 const deleteItem = `-- name: DeleteItem :exec
@@ -94,9 +95,34 @@ WHERE id = $1
 `
 
 // -- invalidate : [GetItemByID, ListItems]
-func (q *Queries) DeleteItem(ctx context.Context, id int64) error {
+func (q *Queries) DeleteItem(ctx context.Context, id int64, getItemByID *int64, listItems *ListItemsParams) error {
 	_, err := q.db.WExec(ctx, "DeleteItem", deleteItem, id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// invalidate
+	invalidateErr := q.db.PostExec(func() error {
+		var anyErr error
+		if getItemByID != nil {
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetItemByID:%+v", *getItemByID))
+			if err != nil {
+				anyErr = err
+			}
+		}
+		if listItems != nil {
+			err = q.cache.Invalidate(ctx, listItems.CacheKey())
+			if err != nil {
+				anyErr = err
+			}
+		}
+		return anyErr
+	})
+	if invalidateErr != nil {
+		// invalidateErr is ignored for now.
+	}
+
+	return nil
 }
 
 const getItemByID = `-- name: GetItemByID :one
@@ -106,9 +132,11 @@ WHERE id = $1 LIMIT 1
 
 // -- cache : 5m
 func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
+	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
-		row := q.db.WQueryRow(ctx, "GetItemByID", getItemByID, id)
+		row := q.db.WQueryRow(ctx, "GetItemByID", getItemByID,
+			id)
 		i := &Item{}
 		err := row.Scan(
 			&i.ID,
@@ -127,18 +155,17 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		v, _, err := dbRead()
-		return v.(*Item), err
+		rv, _, err := dbRead()
+		return rv.(*Item), err
 	}
 
-	// TODO(mustRevalidate, noStore)
-	var v *Item
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetItemByID:%+v", id), &v, dbRead, false, false)
+	var rv *Item
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetItemByID:%+v", id), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return v, err
 
+	return rv, err
 }
 
 const listItems = `-- name: ListItems :many
@@ -201,6 +228,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, e
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }
 
@@ -251,6 +279,7 @@ func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }
 
@@ -301,5 +330,6 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }

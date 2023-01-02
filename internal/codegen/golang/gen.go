@@ -113,6 +113,7 @@ func Generate(ctx context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenR
 		enums, structs = filterUnusedStructs(enums, structs, queries)
 	}
 
+	buildQueryInvalidates(queries)
 	return generate(req, enums, structs, queries)
 }
 
