@@ -52,7 +52,7 @@ func (ns NullItemcategory) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return ns.Itemcategory, nil
+	return string(ns.Itemcategory), nil
 }
 
 type Order struct {
