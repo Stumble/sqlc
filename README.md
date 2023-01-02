@@ -4,6 +4,11 @@
 1. a set of rules mapping pg types to go types.
 2. always emit JSON tag.
 3. TODO: duplicated ENUM values, in every generated model file.
+4. Since NULL is not “equal to” NULL, (The null value represents an unknown
+   value, and it is not known whether two unknown values are equal.), You should never pass
+   a nil pointer to the function argument in a select query where condition.
+   Also unlike needle, cache for query with parameters having one
+   or more pointer fields is not supported.
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:
