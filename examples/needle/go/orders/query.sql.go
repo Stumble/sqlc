@@ -45,7 +45,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 			&i.ID,
 			&i.Userid,
 			&i.Itemid,
-			&i.Createdat,
+			&i.CreatedAt,
 			&i.Isdeleted,
 		)
 		if err == pgx.ErrNoRows {
@@ -109,7 +109,7 @@ type GetOrderByIDRow struct {
 	ID            int32
 	Userid        int32
 	Itemid        int32
-	Createdat     time.Time
+	CreatedAt     time.Time
 	Username      string
 	Userthumbnail string
 	Itemname      string
@@ -130,7 +130,7 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 			&i.ID,
 			&i.Userid,
 			&i.Itemid,
-			&i.Createdat,
+			&i.CreatedAt,
 			&i.Username,
 			&i.Userthumbnail,
 			&i.Itemname,
@@ -197,7 +197,7 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 				&i.ID,
 				&i.Userid,
 				&i.Itemid,
-				&i.Createdat,
+				&i.CreatedAt,
 				&i.Isdeleted,
 			); err != nil {
 				return nil, 0, err
@@ -258,7 +258,7 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 				&i.ID,
 				&i.Userid,
 				&i.Itemid,
-				&i.Createdat,
+				&i.CreatedAt,
 				&i.Isdeleted,
 			); err != nil {
 				return nil, 0, err

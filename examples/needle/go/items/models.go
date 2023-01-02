@@ -65,6 +65,6 @@ type Item struct {
 	Price       pgtype.Numeric `json:"price"`
 	Thumbnail   string         `json:"thumbnail"`
 	Metadata    []byte         `json:"metadata"`
-	Createdat   time.Time      `json:"createdat"`
-	Updatedat   time.Time      `json:"updatedat"`
+	CreatedAt   time.Time      `json:"createdat"`
+	UpdatedAt   time.Time      `json:"updatedat"`
 }
