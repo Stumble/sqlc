@@ -24,6 +24,9 @@ func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgx
 			if err != nil {
 				return
 			}
+			if rv.Cache < 1 * time.Millisecond {
+				return rv, fmt.Errorf("cache duration too short: %s", v)
+			}
 		case WPgxOptionKeyInvalidate:
 			trimed := strings.Trim(v, " []")
 			fnNames := strings.Split(trimed, ",")
