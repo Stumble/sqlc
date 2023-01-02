@@ -1,14 +1,18 @@
 # A wicked fork
 
+## TODOs
+1. Batch and CopyFrom support for wpgx.
+
 ## Opinionated choices
 1. a set of rules mapping pg types to go types.
 2. always emit JSON tag.
-3. TODO: duplicated ENUM values, in every generated model file.
+3. Unified place for all types defined in the query. 
+   Usecase: eliminate duplicated ENUM values, in every generated model file.
 4. Since NULL is not “equal to” NULL, (The null value represents an unknown
    value, and it is not known whether two unknown values are equal.), You should never pass
    a nil pointer to the function argument in a select query where condition.
-   Also unlike needle, cache for query with parameters having one
-   or more pointer fields is not supported.
+   Also unlike needle, cache for query with parameters having pointer fields is not supported.
+5. Add Check(), Load(), Dump() function to query, just like needle.
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:
