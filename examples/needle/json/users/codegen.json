@@ -53407,6 +53407,105 @@
       "options": {}
     },
     {
+      "text": "SELECT id, name FROM users\nWHERE id \u003e $1\nORDER BY id\nLIMIT $2",
+      "name": "ListUserNames",
+      "cmd": ":many",
+      "columns": [
+        {
+          "name": "id",
+          "not_null": true,
+          "is_array": false,
+          "comment": "",
+          "length": -1,
+          "is_named_param": false,
+          "is_func_call": false,
+          "scope": "",
+          "table": {
+            "catalog": "",
+            "schema": "",
+            "name": "users"
+          },
+          "table_alias": "",
+          "type": {
+            "catalog": "",
+            "schema": "pg_catalog",
+            "name": "int4"
+          }
+        },
+        {
+          "name": "name",
+          "not_null": true,
+          "is_array": false,
+          "comment": "",
+          "length": -1,
+          "is_named_param": false,
+          "is_func_call": false,
+          "scope": "",
+          "table": {
+            "catalog": "",
+            "schema": "",
+            "name": "users"
+          },
+          "table_alias": "",
+          "type": {
+            "catalog": "",
+            "schema": "pg_catalog",
+            "name": "varchar"
+          }
+        }
+      ],
+      "params": [
+        {
+          "number": 1,
+          "column": {
+            "name": "after",
+            "not_null": true,
+            "is_array": false,
+            "comment": "",
+            "length": -1,
+            "is_named_param": true,
+            "is_func_call": false,
+            "scope": "",
+            "table": {
+              "catalog": "",
+              "schema": "",
+              "name": "users"
+            },
+            "table_alias": "",
+            "type": {
+              "catalog": "",
+              "schema": "",
+              "name": "pg_catalog.int4"
+            }
+          }
+        },
+        {
+          "number": 2,
+          "column": {
+            "name": "first",
+            "not_null": true,
+            "is_array": false,
+            "comment": "",
+            "length": -1,
+            "is_named_param": true,
+            "is_func_call": false,
+            "scope": "",
+            "table": null,
+            "table_alias": "",
+            "type": {
+              "catalog": "",
+              "schema": "",
+              "name": "integer"
+            }
+          }
+        }
+      ],
+      "comments": [],
+      "filename": "query.sql",
+      "insert_into_table": null,
+      "options": {}
+    },
+    {
       "text": "INSERT INTO Users (\n  Name, Metadata, Thumbnail\n) VALUES (\n  $1, $2, $3\n)\nRETURNING id, name, metadata, thumbnail, createdat",
       "name": "CreateAuthor",
       "cmd": ":one",
@@ -53636,12 +53735,71 @@
         }
       ],
       "comments": [
-        " -- invalidate : [GetUserByID, GetUserByName]"
+        " -- invalidate : [GetUserByID, ListUsers]"
       ],
       "filename": "query.sql",
       "insert_into_table": null,
       "options": {
-        "invalidate": "[GetUserByID, GetUserByName]"
+        "invalidate": "[GetUserByID, ListUsers]"
+      }
+    },
+    {
+      "text": "WITH RECURSIVE fibonacci(n,x,y) AS (\n\tSELECT\n    \t1 AS n ,\n  \t\t0 :: NUMERIC AS x,\n    \t1 :: NUMERIC AS y\n  \tUNION ALL\n  \tSELECT\n    \tn + 1 AS n,\n  \t\ty AS x,\n    \tx + y AS y\n  \tFROM fibonacci\n  \tWHERE n \u003c $1::int\n\t)\nSELECT\n\tx\nFROM fibonacci",
+      "name": "Complicated",
+      "cmd": ":many",
+      "columns": [
+        {
+          "name": "x",
+          "not_null": true,
+          "is_array": false,
+          "comment": "",
+          "length": -1,
+          "is_named_param": false,
+          "is_func_call": false,
+          "scope": "",
+          "table": {
+            "catalog": "",
+            "schema": "",
+            "name": "fibonacci"
+          },
+          "table_alias": "",
+          "type": {
+            "catalog": "",
+            "schema": "pg_catalog",
+            "name": "numeric"
+          }
+        }
+      ],
+      "params": [
+        {
+          "number": 1,
+          "column": {
+            "name": "n",
+            "not_null": true,
+            "is_array": false,
+            "comment": "",
+            "length": -1,
+            "is_named_param": false,
+            "is_func_call": false,
+            "scope": "",
+            "table": null,
+            "table_alias": "",
+            "type": {
+              "catalog": "",
+              "schema": "pg_catalog",
+              "name": "int4"
+            }
+          }
+        }
+      ],
+      "comments": [
+        " -- cache : 1m",
+        " example of sqlc cannot handle recursive query."
+      ],
+      "filename": "query.sql",
+      "insert_into_table": null,
+      "options": {
+        "cache": "1m"
       }
     }
   ],

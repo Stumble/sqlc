@@ -13,5 +13,5 @@ type User struct {
 	Name      string    `json:"name"`
 	Metadata  []byte    `json:"metadata"`
 	Thumbnail string    `json:"thumbnail"`
-	Createdat time.Time `json:"createdat"`
+	CreatedAt time.Time `json:"createdat"`
 }

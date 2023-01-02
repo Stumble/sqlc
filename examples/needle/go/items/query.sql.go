@@ -67,8 +67,8 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item
 			&i.Price,
 			&i.Thumbnail,
 			&i.Metadata,
-			&i.Createdat,
-			&i.Updatedat,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		)
 		if err == pgx.ErrNoRows {
 			return nil, cacheDuration, nil
@@ -146,8 +146,8 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 			&i.Price,
 			&i.Thumbnail,
 			&i.Metadata,
-			&i.Createdat,
-			&i.Updatedat,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		)
 		if err == pgx.ErrNoRows {
 			return nil, cacheDuration, nil
@@ -205,8 +205,8 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, e
 				&i.Price,
 				&i.Thumbnail,
 				&i.Metadata,
-				&i.Createdat,
-				&i.Updatedat,
+				&i.CreatedAt,
+				&i.UpdatedAt,
 			); err != nil {
 				return nil, 0, err
 			}
@@ -255,8 +255,8 @@ func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error
 				&i.Price,
 				&i.Thumbnail,
 				&i.Metadata,
-				&i.Createdat,
-				&i.Updatedat,
+				&i.CreatedAt,
+				&i.UpdatedAt,
 			); err != nil {
 				return nil, 0, err
 			}
@@ -305,8 +305,8 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 				&i.Price,
 				&i.Thumbnail,
 				&i.Metadata,
-				&i.Createdat,
-				&i.Updatedat,
+				&i.CreatedAt,
+				&i.UpdatedAt,
 			); err != nil {
 				return nil, 0, err
 			}
