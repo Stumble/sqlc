@@ -6,6 +6,7 @@ package items
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -22,16 +23,35 @@ type WGConn interface {
 	PostExec(f wpgx.PostExecFunc) error
 }
 
-func New(db WGConn) *Queries {
-	return &Queries{db: db}
+type ReadWithTtlFunc = func() (any, time.Duration, error)
+
+type Cache interface {
+	GetWithTtl(
+		ctx context.Context, key string, target any,
+		readWithTtl ReadWithTtlFunc, noCache bool, noStore bool) error
+	Set(ctx context.Context, key string, val any, ttl time.Duration) error
+	Invalidate(ctx context.Context, key string) error
+}
+
+func New(db WGConn, cache Cache) *Queries {
+	return &Queries{db: db, cache: cache}
 }
 
 type Queries struct {
-	db WGConn
+	db    WGConn
+	cache Cache
 }
 
 func (q *Queries) WithTx(tx *wpgx.WTx) *Queries {
 	return &Queries{
-		db: tx,
+		db:    tx,
+		cache: q.cache,
+	}
+}
+
+func (q *Queries) WithCache(cache Cache) *Queries {
+	return &Queries{
+		db:    q.db,
+		cache: cache,
 	}
 }

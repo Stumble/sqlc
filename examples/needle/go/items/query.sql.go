@@ -7,8 +7,10 @@ package items
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5"
 )
 
 const createItems = `-- name: CreateItems :one
@@ -29,28 +31,47 @@ type CreateItemsParams struct {
 	Metadata    []byte
 }
 
-func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (Item, error) {
-	row := q.db.QueryRow(ctx, createItems,
-		arg.Name,
-		arg.Description,
-		arg.Category,
-		arg.Price,
-		arg.Thumbnail,
-		arg.Metadata,
-	)
-	var i Item
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Description,
-		&i.Category,
-		&i.Price,
-		&i.Thumbnail,
-		&i.Metadata,
-		&i.Createdat,
-		&i.Updatedat,
-	)
-	return i, err
+func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item, error) {
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 0)
+		row := q.db.WQueryRow(ctx, "CreateItems", createItems,
+			arg.Name,
+			arg.Description,
+			arg.Category,
+			arg.Price,
+			arg.Thumbnail,
+			arg.Metadata,
+		)
+		i := &Item{}
+		err := row.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Category,
+			&i.Price,
+			&i.Thumbnail,
+			&i.Metadata,
+			&i.Createdat,
+			&i.Updatedat,
+		)
+		if err == pgx.ErrNoRows {
+			return nil, cacheDuration, nil
+		}
+		return i, cacheDuration, err
+	}
+	if q.cache == nil {
+		v, _, err := dbRead()
+		return v.(*Item), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var v *Item
+	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	if err != nil {
+		return nil, err
+	}
+	return v, err
+
 }
 
 const deleteItem = `-- name: DeleteItem :exec
@@ -60,7 +81,7 @@ WHERE id = $1
 
 // -- invalidate : [GetItemByID, ListItems]
 func (q *Queries) DeleteItem(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteItem, id)
+	_, err := q.db.WExec(ctx, "DeleteItem", deleteItem, id)
 	return err
 }
 
@@ -70,21 +91,40 @@ WHERE id = $1 LIMIT 1
 `
 
 // -- cache : 5m
-func (q *Queries) GetItemByID(ctx context.Context, id int64) (Item, error) {
-	row := q.db.QueryRow(ctx, getItemByID, id)
-	var i Item
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Description,
-		&i.Category,
-		&i.Price,
-		&i.Thumbnail,
-		&i.Metadata,
-		&i.Createdat,
-		&i.Updatedat,
-	)
-	return i, err
+func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 300000)
+		row := q.db.WQueryRow(ctx, "GetItemByID", getItemByID, id)
+		i := &Item{}
+		err := row.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.Category,
+			&i.Price,
+			&i.Thumbnail,
+			&i.Metadata,
+			&i.Createdat,
+			&i.Updatedat,
+		)
+		if err == pgx.ErrNoRows {
+			return nil, cacheDuration, nil
+		}
+		return i, cacheDuration, err
+	}
+	if q.cache == nil {
+		v, _, err := dbRead()
+		return v.(*Item), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var v *Item
+	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	if err != nil {
+		return nil, err
+	}
+	return v, err
+
 }
 
 const listItems = `-- name: ListItems :many
@@ -100,33 +140,48 @@ type ListItemsParams struct {
 }
 
 func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, error) {
-	rows, err := q.db.Query(ctx, listItems, arg.After, arg.First)
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 0)
+		rows, err := q.db.WQuery(ctx, "ListItems", listItems, arg.After, arg.First)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		var items []Item
+		for rows.Next() {
+			var i Item
+			if err := rows.Scan(
+				&i.ID,
+				&i.Name,
+				&i.Description,
+				&i.Category,
+				&i.Price,
+				&i.Thumbnail,
+				&i.Metadata,
+				&i.Createdat,
+				&i.Updatedat,
+			); err != nil {
+				return nil, 0, err
+			}
+			items = append(items, i)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.cache == nil {
+		items, _, err := dbRead()
+		return items.([]Item), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var items []Item
+	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var items []Item
-	for rows.Next() {
-		var i Item
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Description,
-			&i.Category,
-			&i.Price,
-			&i.Thumbnail,
-			&i.Metadata,
-			&i.Createdat,
-			&i.Updatedat,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, err
 }
 
 const listSomeItems = `-- name: ListSomeItems :many
@@ -135,33 +190,48 @@ WHERE id = ANY($1::bigserial[])
 `
 
 func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error) {
-	rows, err := q.db.Query(ctx, listSomeItems, ids)
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 0)
+		rows, err := q.db.WQuery(ctx, "ListSomeItems", listSomeItems, ids)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		var items []Item
+		for rows.Next() {
+			var i Item
+			if err := rows.Scan(
+				&i.ID,
+				&i.Name,
+				&i.Description,
+				&i.Category,
+				&i.Price,
+				&i.Thumbnail,
+				&i.Metadata,
+				&i.Createdat,
+				&i.Updatedat,
+			); err != nil {
+				return nil, 0, err
+			}
+			items = append(items, i)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.cache == nil {
+		items, _, err := dbRead()
+		return items.([]Item), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var items []Item
+	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var items []Item
-	for rows.Next() {
-		var i Item
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Description,
-			&i.Category,
-			&i.Price,
-			&i.Thumbnail,
-			&i.Metadata,
-			&i.Createdat,
-			&i.Updatedat,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, err
 }
 
 const searchItems = `-- name: SearchItems :many
@@ -170,31 +240,46 @@ WHERE Name LIKE $1
 `
 
 func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) {
-	rows, err := q.db.Query(ctx, searchItems, name)
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 0)
+		rows, err := q.db.WQuery(ctx, "SearchItems", searchItems, name)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		var items []Item
+		for rows.Next() {
+			var i Item
+			if err := rows.Scan(
+				&i.ID,
+				&i.Name,
+				&i.Description,
+				&i.Category,
+				&i.Price,
+				&i.Thumbnail,
+				&i.Metadata,
+				&i.Createdat,
+				&i.Updatedat,
+			); err != nil {
+				return nil, 0, err
+			}
+			items = append(items, i)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.cache == nil {
+		items, _, err := dbRead()
+		return items.([]Item), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var items []Item
+	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var items []Item
-	for rows.Next() {
-		var i Item
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Description,
-			&i.Category,
-			&i.Price,
-			&i.Thumbnail,
-			&i.Metadata,
-			&i.Createdat,
-			&i.Updatedat,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, err
 }
