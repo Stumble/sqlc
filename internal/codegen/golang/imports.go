@@ -115,6 +115,7 @@ func (i *importer) dbImports() fileImports {
 	var pkg []ImportSpec
 	std := []ImportSpec{
 		{Path: "context"},
+		{Path: "time"},
 	}
 
 	sqlpkg := parseDriver(i.Settings.Go.SqlPackage)
@@ -173,9 +174,15 @@ func buildImports(settings *plugin.Settings, queries []Query, uses func(string) 
 				pkg[ImportSpec{Path: "github.com/jackc/pgconn"}] = struct{}{}
 			case SQLDriverPGXV5:
 				pkg[ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"}] = struct{}{}
+			case SQLDriverWPGX:
+				pkg[ImportSpec{Path: "github.com/jackc/pgx/v5/pgconn"}] = struct{}{}
 			default:
 				std["database/sql"] = struct{}{}
 			}
+		}
+
+		if q.Cmd == metadata.CmdOne && sqlpkg == SQLDriverWPGX {
+			pkg[ImportSpec{Path: "github.com/jackc/pgx/v5"}] = struct{}{}
 		}
 	}
 
@@ -382,6 +389,7 @@ func (i *importer) queryImports(filename string) fileImports {
 
 	if anyNonCopyFrom {
 		std["context"] = struct{}{}
+		std["time"] = struct{}{}
 	}
 
 	sqlpkg := parseDriver(i.Settings.Go.SqlPackage)
