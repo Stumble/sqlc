@@ -382,6 +382,7 @@ func (i *importer) queryImports(filename string) fileImports {
 	if anyNonCopyFrom {
 		std["context"] = struct{}{}
 		std["time"] = struct{}{}
+		std["fmt"] = struct{}{}
 	}
 
 	sqlpkg := parseDriver(i.Settings.Go.SqlPackage)

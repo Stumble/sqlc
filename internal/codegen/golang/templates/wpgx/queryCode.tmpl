@@ -13,6 +13,12 @@ type {{.Arg.Type}} struct { {{- range .Arg.Struct.Fields}}
   {{.Name}} {{.Type}} {{if .Tag}}{{$.Q}}{{.Tag}}{{$.Q}}{{end}}
   {{- end}}
 }
+
+// CacheKey - cache key
+func ({{.Arg.Name}} {{.Arg.Type}}) CacheKey() string {
+    prefix := "{{.MethodName}}:"
+	return prefix + fmt.Sprintf({{.Arg.CacheKeySprintf}})
+}
 {{end}}
 
 {{if .Ret.EmitStruct}}
@@ -44,7 +50,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (*{{.Ret.T
 
 	// TODO(mustRevalidate, noStore)
 	var v *{{.Ret.Type}}
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +90,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) ([]{{.Ret.
 
 	// TODO(mustRevalidate, noStore)
 	var items []{{.Ret.DefineType}}
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}

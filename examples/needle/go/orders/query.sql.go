@@ -7,6 +7,7 @@ package orders
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgtype"
@@ -25,6 +26,12 @@ RETURNING id, userid, itemid, createdat, isdeleted
 type CreateAuthorParams struct {
 	Userid int32
 	Itemid int32
+}
+
+// CacheKey - cache key
+func (arg CreateAuthorParams) CacheKey() string {
+	prefix := "CreateAuthor:"
+	return prefix + fmt.Sprintf("%+v,%+v", arg.Userid, arg.Itemid)
 }
 
 func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Order, error) {
@@ -51,7 +58,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 
 	// TODO(mustRevalidate, noStore)
 	var v *Order
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +145,7 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 
 	// TODO(mustRevalidate, noStore)
 	var v *GetOrderByIDRow
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, "GetOrderByID", &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +167,12 @@ type ListOrdersByGenderParams struct {
 	After  int32
 	First  int32
 	Gender string
+}
+
+// CacheKey - cache key
+func (arg ListOrdersByGenderParams) CacheKey() string {
+	prefix := "ListOrdersByGender:"
+	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.After, arg.First, arg.Gender)
 }
 
 // -- cache : 1m
@@ -198,7 +211,7 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 
 	// TODO(mustRevalidate, noStore)
 	var items []Order
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +230,12 @@ type ListOrdersByUserParams struct {
 	Userid int32
 	After  time.Time
 	First  int32
+}
+
+// CacheKey - cache key
+func (arg ListOrdersByUserParams) CacheKey() string {
+	prefix := "ListOrdersByUser:"
+	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.Userid, arg.After, arg.First)
 }
 
 func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserParams) ([]Order, error) {
@@ -253,7 +272,7 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 
 	// TODO(mustRevalidate, noStore)
 	var items []Order
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
