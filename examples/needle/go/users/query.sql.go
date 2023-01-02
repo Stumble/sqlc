@@ -61,7 +61,6 @@ func (q *Queries) Complicated(ctx context.Context, n int32) ([]pgtype.Numeric, e
 		return items.([]pgtype.Numeric), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []pgtype.Numeric
 	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("Complicated:%+v", n), &items, dbRead, false, false)
 	if err != nil {
@@ -310,7 +309,6 @@ func (q *Queries) ListUserNames(ctx context.Context, arg ListUserNamesParams) ([
 		return items.([]ListUserNamesRow), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []ListUserNamesRow
 	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
@@ -370,7 +368,6 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return items.([]User), err
 	}
 
-	// TODO(mustRevalidate, noStore)
 	var items []User
 	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
