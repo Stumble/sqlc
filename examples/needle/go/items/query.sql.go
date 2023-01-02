@@ -7,6 +7,7 @@ package items
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgtype"
@@ -29,6 +30,19 @@ type CreateItemsParams struct {
 	Price       pgtype.Numeric
 	Thumbnail   string
 	Metadata    []byte
+}
+
+// CacheKey - cache key
+func (arg CreateItemsParams) CacheKey() string {
+	prefix := "CreateItems:"
+	return prefix + fmt.Sprintf("%+v,%+v,%+v,%+v,%+v,%+v",
+		arg.Name,
+		arg.Description,
+		arg.Category,
+		arg.Price,
+		arg.Thumbnail,
+		arg.Metadata,
+	)
 }
 
 func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item, error) {
@@ -66,7 +80,7 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item
 
 	// TODO(mustRevalidate, noStore)
 	var v *Item
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +133,7 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 
 	// TODO(mustRevalidate, noStore)
 	var v *Item
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetItemByID:%+v", id), &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +151,12 @@ LIMIT $2
 type ListItemsParams struct {
 	After int64
 	First int32
+}
+
+// CacheKey - cache key
+func (arg ListItemsParams) CacheKey() string {
+	prefix := "ListItems:"
+	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
 }
 
 func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, error) {
@@ -177,7 +197,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, e
 
 	// TODO(mustRevalidate, noStore)
 	var items []Item
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +247,7 @@ func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error
 
 	// TODO(mustRevalidate, noStore)
 	var items []Item
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("ListSomeItems:%+v", ids), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +297,7 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 
 	// TODO(mustRevalidate, noStore)
 	var items []Item
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("SearchItems:%+v", name), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
