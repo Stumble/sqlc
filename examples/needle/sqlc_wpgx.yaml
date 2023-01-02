@@ -1,0 +1,39 @@
+version: "2"
+overrides:
+  go:
+    rename:
+      createdat: "CreatedAt"
+      updatedat: "UpdatedAt"
+    # overrides:
+    #   - db_type: "timestamptz"
+    #     nullable: true
+    #     engine: "postgresql"
+    #     go_type:
+    #       import: "gopkg.in/guregu/null.v4"
+    #       package: "null"
+    #       type: "Time"
+sql:
+- schema: "users/schema.sql"
+  queries: "users/query.sql"
+  engine: "postgresql"
+  gen:
+    go: 
+      sql_package: "wpgx"
+      package: "users"
+      out: "go/users"
+- schema: "items/schema.sql"
+  queries: "items/query.sql"
+  engine: "postgresql"
+  gen:
+    go: 
+      sql_package: "wpgx"
+      package: "items"
+      out: "go/items"
+- schema: ["orders/schema.sql", "items/schema.sql", "users/schema.sql"]
+  queries: "orders/query.sql"
+  engine: "postgresql"
+  gen:
+    go: 
+      sql_package: "wpgx"
+      package: "orders"
+      out: "go/orders"

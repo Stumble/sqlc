@@ -3,28 +3,22 @@
 ## Opinionated choices
 1. a set of rules mapping pg types to go types.
 2. always emit JSON tag.
-3. TODO: duplicated ENUM values, in every generated modle file.
+3. TODO: duplicated ENUM values, in every generated model file.
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:
    Only one model, which is defined by the first table creation statement of the first
    schema, will be generated into the model file.
-2. Need to preserve camel-styled names:
-   Well we cannot. Tokens were lower-cased in pg parser. To generate good-looking camel style
+2. Need to preserve camel-styled names: Use rename option in configuration file.
+   Tokens were lower-cased in pg parser. To generate good-looking camel style
    variable names for golang, if you are not using the recommended snake case in SQL, you will
-   need to use the `rename` feature. However, currently the rename option is not exposed to plugins.
-   Plus that there is no global rename option, which is not convenient.
+   need to use the `rename` feature.
 3. Not really doing type-checking on everything:
    Although using type cast can help to generate correctly typed code, but we found that not
    all SQL code are type-checked correctly. We might need to implement a new type check pass.
 
 ## Cherry-picked fixes
-
-### Rename
-https://github.com/kyleconroy/sqlc/pull/2001
-
-### XXX
-https://github.com/kyleconroy/sqlc/pull/1996
++ TBD: https://github.com/kyleconroy/sqlc/pull/2001
 
 # sqlc: A SQL Compiler
 

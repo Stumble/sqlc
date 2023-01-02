@@ -59,6 +59,6 @@ type Order struct {
 	ID        int32     `json:"id"`
 	Userid    int32     `json:"userid"`
 	Itemid    int32     `json:"itemid"`
-	Createdat time.Time `json:"createdat"`
+	CreatedAt time.Time `json:"createdat"`
 	Isdeleted bool      `json:"isdeleted"`
 }
