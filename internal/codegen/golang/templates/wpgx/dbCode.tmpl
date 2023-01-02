@@ -16,26 +16,36 @@ type WGConn interface {
 {{- end }}
 }
 
-{{ if .EmitMethodsWithDBArgument}}
-func New() *Queries {
-	return &Queries{}
-{{- else -}}
-func New(db WGConn) *Queries {
-	return &Queries{db: db}
-{{- end}}
+type ReadWithTtlFunc = func() (any, time.Duration, error)
+
+type Cache interface {
+	GetWithTtl(
+		ctx context.Context, key string, target any,
+		readWithTtl ReadWithTtlFunc, noCache bool, noStore bool) error
+	Set(ctx context.Context, key string, val any, ttl time.Duration) error
+	Invalidate(ctx context.Context, key string) error
+}
+
+func New(db WGConn, cache Cache) *Queries {
+	return &Queries{db: db, cache: cache}
 }
 
 type Queries struct {
-    {{if not .EmitMethodsWithDBArgument}}
-	db WGConn
-    {{end}}
+	db    WGConn
+	cache Cache
 }
 
-{{if not .EmitMethodsWithDBArgument}}
 func (q *Queries) WithTx(tx *wpgx.WTx) *Queries {
 	return &Queries{
-		db: tx,
+		db:    tx,
+		cache: q.cache,
 	}
 }
-{{end}}
+
+func (q *Queries) WithCache(cache Cache) *Queries {
+	return &Queries{
+		db:    q.db,
+		cache: cache,
+	}
+}
 {{end}}

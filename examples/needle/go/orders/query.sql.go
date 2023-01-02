@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5"
 )
 
 const createAuthor = `-- name: CreateAuthor :one
@@ -26,17 +27,36 @@ type CreateAuthorParams struct {
 	Itemid int32
 }
 
-func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (Order, error) {
-	row := q.db.QueryRow(ctx, createAuthor, arg.Userid, arg.Itemid)
-	var i Order
-	err := row.Scan(
-		&i.ID,
-		&i.Userid,
-		&i.Itemid,
-		&i.Createdat,
-		&i.Isdeleted,
-	)
-	return i, err
+func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Order, error) {
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 0)
+		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Userid, arg.Itemid)
+		i := &Order{}
+		err := row.Scan(
+			&i.ID,
+			&i.Userid,
+			&i.Itemid,
+			&i.Createdat,
+			&i.Isdeleted,
+		)
+		if err == pgx.ErrNoRows {
+			return nil, cacheDuration, nil
+		}
+		return i, cacheDuration, err
+	}
+	if q.cache == nil {
+		v, _, err := dbRead()
+		return v.(*Order), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var v *Order
+	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	if err != nil {
+		return nil, err
+	}
+	return v, err
+
 }
 
 const deleteOrder = `-- name: DeleteOrder :exec
@@ -48,7 +68,7 @@ WHERE
 `
 
 func (q *Queries) DeleteOrder(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, deleteOrder, id)
+	_, err := q.db.WExec(ctx, "DeleteOrder", deleteOrder, id)
 	return err
 }
 
@@ -88,23 +108,42 @@ type GetOrderByIDRow struct {
 }
 
 // -- cache : 10m
-func (q *Queries) GetOrderByID(ctx context.Context) (GetOrderByIDRow, error) {
-	row := q.db.QueryRow(ctx, getOrderByID)
-	var i GetOrderByIDRow
-	err := row.Scan(
-		&i.ID,
-		&i.Userid,
-		&i.Itemid,
-		&i.Createdat,
-		&i.Username,
-		&i.Userthumbnail,
-		&i.Itemname,
-		&i.Itemdesc,
-		&i.Itemprice,
-		&i.Itemthumbnail,
-		&i.Itemmetadata,
-	)
-	return i, err
+func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 600000)
+		row := q.db.WQueryRow(ctx, "GetOrderByID", getOrderByID)
+		i := &GetOrderByIDRow{}
+		err := row.Scan(
+			&i.ID,
+			&i.Userid,
+			&i.Itemid,
+			&i.Createdat,
+			&i.Username,
+			&i.Userthumbnail,
+			&i.Itemname,
+			&i.Itemdesc,
+			&i.Itemprice,
+			&i.Itemthumbnail,
+			&i.Itemmetadata,
+		)
+		if err == pgx.ErrNoRows {
+			return nil, cacheDuration, nil
+		}
+		return i, cacheDuration, err
+	}
+	if q.cache == nil {
+		v, _, err := dbRead()
+		return v.(*GetOrderByIDRow), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var v *GetOrderByIDRow
+	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	if err != nil {
+		return nil, err
+	}
+	return v, err
+
 }
 
 const listOrdersByGender = `-- name: ListOrdersByGender :many
@@ -126,29 +165,44 @@ type ListOrdersByGenderParams struct {
 // -- cache : 1m
 // This is just an example for using type annotation for JSON field and 'with clause'.
 func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGenderParams) ([]Order, error) {
-	rows, err := q.db.Query(ctx, listOrdersByGender, arg.After, arg.First, arg.Gender)
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 60000)
+		rows, err := q.db.WQuery(ctx, "ListOrdersByGender", listOrdersByGender, arg.After, arg.First, arg.Gender)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		var items []Order
+		for rows.Next() {
+			var i Order
+			if err := rows.Scan(
+				&i.ID,
+				&i.Userid,
+				&i.Itemid,
+				&i.Createdat,
+				&i.Isdeleted,
+			); err != nil {
+				return nil, 0, err
+			}
+			items = append(items, i)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.cache == nil {
+		items, _, err := dbRead()
+		return items.([]Order), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var items []Order
+	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var items []Order
-	for rows.Next() {
-		var i Order
-		if err := rows.Scan(
-			&i.ID,
-			&i.Userid,
-			&i.Itemid,
-			&i.Createdat,
-			&i.Isdeleted,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, err
 }
 
 const listOrdersByUser = `-- name: ListOrdersByUser :many
@@ -166,27 +220,42 @@ type ListOrdersByUserParams struct {
 }
 
 func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserParams) ([]Order, error) {
-	rows, err := q.db.Query(ctx, listOrdersByUser, arg.Userid, arg.After, arg.First)
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 0)
+		rows, err := q.db.WQuery(ctx, "ListOrdersByUser", listOrdersByUser, arg.Userid, arg.After, arg.First)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		var items []Order
+		for rows.Next() {
+			var i Order
+			if err := rows.Scan(
+				&i.ID,
+				&i.Userid,
+				&i.Itemid,
+				&i.Createdat,
+				&i.Isdeleted,
+			); err != nil {
+				return nil, 0, err
+			}
+			items = append(items, i)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.cache == nil {
+		items, _, err := dbRead()
+		return items.([]Order), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var items []Order
+	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var items []Order
-	for rows.Next() {
-		var i Order
-		if err := rows.Scan(
-			&i.ID,
-			&i.Userid,
-			&i.Itemid,
-			&i.Createdat,
-			&i.Isdeleted,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, err
 }

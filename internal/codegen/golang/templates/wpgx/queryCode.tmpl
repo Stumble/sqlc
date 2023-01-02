@@ -26,62 +26,77 @@ type {{.Ret.Type}} struct { {{- range .Ret.Struct.Fields}}
 {{if eq .Cmd ":one"}}
 {{range .Comments}}//{{.}}
 {{end -}}
-{{- if $.EmitMethodsWithDBArgument -}}
-func (q *Queries) {{.MethodName}}(ctx context.Context, db DBTX, {{.Arg.Pair}}) ({{.Ret.DefineType}}, error) {
-	row := db.QueryRow(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- else -}}
-func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) ({{.Ret.DefineType}}, error) {
-	row := q.db.QueryRow(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- end}}
-	var {{.Ret.Name}} {{.Ret.Type}}
-	err := row.Scan({{.Ret.Scan}})
-	return {{.Ret.ReturnName}}, err
+func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (*{{.Ret.Type}}, error) {
+	dbRead := func() (any, time.Duration, error) {
+        cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
+	    row := q.db.WQueryRow(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+	    {{.Ret.Name}} := &{{.Ret.Type}}{}
+	    err := row.Scan({{.Ret.Scan}})
+        if err == pgx.ErrNoRows {
+            return nil, cacheDuration, nil
+        }
+	    return {{.Ret.Name}}, cacheDuration, err
+    }
+	if q.cache == nil {
+		v, _, err := dbRead()
+		return v.(*{{.Ret.Type}}), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var v *{{.Ret.Type}}
+	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	if err != nil {
+		return nil, err
+	}
+	return v, err
+
 }
 {{end}}
 
 {{if eq .Cmd ":many"}}
 {{range .Comments}}//{{.}}
 {{end -}}
-{{- if $.EmitMethodsWithDBArgument -}}
-func (q *Queries) {{.MethodName}}(ctx context.Context, db DBTX, {{.Arg.Pair}}) ([]{{.Ret.DefineType}}, error) {
-	rows, err := db.Query(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- else -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) ([]{{.Ret.DefineType}}, error) {
-	rows, err := q.db.Query(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- end}}
+	dbRead := func() (any, time.Duration, error) {
+        cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
+        rows, err := q.db.WQuery(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+	    var items []{{.Ret.DefineType}}
+		for rows.Next() {
+		    var {{.Ret.Name}} {{.Ret.Type}}
+		    if err := rows.Scan({{.Ret.Scan}}); err != nil {
+			    return nil, 0, err
+		    }
+		    items = append(items, {{.Ret.ReturnName}})
+		}
+		if err := rows.Err(); err != nil {
+			return nil, 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.cache == nil {
+		items, _, err := dbRead()
+		return items.([]{{.Ret.DefineType}}), err
+	}
+
+	// TODO(mustRevalidate, noStore)
+	var items []{{.Ret.DefineType}}
+	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	{{- if $.EmitEmptySlices}}
-	items := []{{.Ret.DefineType}}{}
-	{{else}}
-	var items []{{.Ret.DefineType}}
-	{{end -}}
-	for rows.Next() {
-		var {{.Ret.Name}} {{.Ret.Type}}
-		if err := rows.Scan({{.Ret.Scan}}); err != nil {
-			return nil, err
-		}
-		items = append(items, {{.Ret.ReturnName}})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, err
 }
 {{end}}
 
 {{if eq .Cmd ":exec"}}
 {{range .Comments}}//{{.}}
 {{end -}}
-{{- if $.EmitMethodsWithDBArgument -}}
-func (q *Queries) {{.MethodName}}(ctx context.Context, db DBTX, {{.Arg.Pair}}) error {
-	_, err := db.Exec(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- else -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) error {
-	_, err := q.db.Exec(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- end}}
+	_, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
 	return err
 }
 {{end}}
@@ -89,13 +104,8 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) error {
 {{if eq .Cmd ":execrows"}}
 {{range .Comments}}//{{.}}
 {{end -}}
-{{if $.EmitMethodsWithDBArgument -}}
-func (q *Queries) {{.MethodName}}(ctx context.Context, db DBTX, {{.Arg.Pair}}) (int64, error) {
-	result, err := db.Exec(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- else -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (int64, error) {
-	result, err := q.db.Exec(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- end}}
+	result, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
 	if err != nil {
 		return 0, err
 	}
@@ -106,13 +116,8 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (int64, er
 {{if eq .Cmd ":execresult"}}
 {{range .Comments}}//{{.}}
 {{end -}}
-{{- if $.EmitMethodsWithDBArgument -}}
-func (q *Queries) {{.MethodName}}(ctx context.Context, db DBTX, {{.Arg.Pair}}) (pgconn.CommandTag, error) {
-	return db.Exec(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- else -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (pgconn.CommandTag, error) {
-	return q.db.Exec(ctx, {{.ConstantName}}, {{.Arg.Params}})
-{{- end}}
+	return q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
 }
 {{end}}
 

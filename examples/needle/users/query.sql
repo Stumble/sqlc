@@ -14,6 +14,12 @@ WHERE id > @after
 ORDER BY id
 LIMIT @first;
 
+-- name: ListUserNames :many
+SELECT id, name FROM users
+WHERE id > @after
+ORDER BY id
+LIMIT @first;
+
 -- name: CreateAuthor :one
 -- -- invalidate : [GetUserByID, GetUserByName]
 INSERT INTO Users (
