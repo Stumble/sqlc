@@ -149,18 +149,40 @@ func (v QueryValue) Scan() string {
 	return "\n" + strings.Join(out, ",\n")
 }
 
+// CacheKeySprintf is used by WPgx only.
+func (v QueryValue) CacheKeySprintf() string {
+	if v.Struct == nil {
+		panic(fmt.Errorf("trying to construct sprintf format for non-struct query arg: %+v", v))
+	}
+	format := make([]string, 0)
+	args := make([]string, 0)
+	for _, f := range v.Struct.Fields {
+		if strings.HasPrefix(v.Typ, "[]*") {
+			panic(fmt.Errorf("[]*T typed arguments query cache not supported: %+v", v))
+		}
+		format = append(format, "%+v")
+		args = append(args, v.Name+"."+f.Name)
+	}
+	formatStr := `"` + strings.Join(format, ",") + `"`
+	if len(args) <= 3 {
+		return formatStr + ", " + strings.Join(args, ",")
+	}
+	args = append(args, "")
+	return formatStr + ",\n" + strings.Join(args, ",\n")
+}
+
 // A struct used to generate methods and fields on the Queries struct
 type Query struct {
-	Cmd           string
-	Comments      []string
-	MethodName    string
-	FieldName     string
-	ConstantName  string
-	SQL           string
-	SourceName    string
-	Ret           QueryValue
-	Arg           QueryValue
-	Option        WPgxOption
+	Cmd          string
+	Comments     []string
+	MethodName   string
+	FieldName    string
+	ConstantName string
+	SQL          string
+	SourceName   string
+	Ret          QueryValue
+	Arg          QueryValue
+	Option       WPgxOption
 	// Used for :copyfrom
 	Table *plugin.Identifier
 }
@@ -179,4 +201,20 @@ func (q Query) TableIdentifier() string {
 		}
 	}
 	return "[]string{" + strings.Join(escapedNames, ", ") + "}"
+}
+
+// CacheKey is used by WPgx only.
+func (q Query) CacheKey() string {
+	if q.Arg.isEmpty() {
+		return `"` + q.MethodName + `"`
+	}
+	if q.Arg.Struct == nil {
+		argName := q.Arg.Name
+		if q.Arg.IsPointer() {
+			argName = "*" + argName
+		}
+		return `fmt.Sprintf("` + q.MethodName + `:%+v",` + argName + `)`
+	} else {
+		return q.Arg.Name + `.CacheKey()`
+	}
 }
