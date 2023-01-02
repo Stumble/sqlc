@@ -104,7 +104,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams, getU
 			&i.Name,
 			&i.Metadata,
 			&i.Thumbnail,
-			&i.Createdat,
+			&i.CreatedAt,
 		)
 		if err == pgx.ErrNoRows {
 			return nil, cacheDuration, nil
@@ -200,7 +200,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 			&i.Name,
 			&i.Metadata,
 			&i.Thumbnail,
-			&i.Createdat,
+			&i.CreatedAt,
 		)
 		if err == pgx.ErrNoRows {
 			return nil, cacheDuration, nil
@@ -239,7 +239,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 			&i.Name,
 			&i.Metadata,
 			&i.Thumbnail,
-			&i.Createdat,
+			&i.CreatedAt,
 		)
 		if err == pgx.ErrNoRows {
 			return nil, cacheDuration, nil
@@ -352,7 +352,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 				&i.Name,
 				&i.Metadata,
 				&i.Thumbnail,
-				&i.Createdat,
+				&i.CreatedAt,
 			); err != nil {
 				return nil, 0, err
 			}
