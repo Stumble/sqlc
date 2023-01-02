@@ -67,6 +67,7 @@ func (q *Queries) Complicated(ctx context.Context, n int32) ([]pgtype.Numeric, e
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }
 
@@ -92,10 +93,12 @@ func (arg CreateAuthorParams) CacheKey() string {
 }
 
 // -- invalidate : [GetUserByID, GetUserByName]
-func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*User, error) {
+func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams, getUserByID *int32, getUserByName *string) (*User, error) {
+	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 0)
-		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Name, arg.Metadata, arg.Thumbnail)
+		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor,
+			arg.Name, arg.Metadata, arg.Thumbnail)
 		i := &User{}
 		err := row.Scan(
 			&i.ID,
@@ -110,18 +113,38 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Us
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		v, _, err := dbRead()
-		return v.(*User), err
+		rv, _, err := dbRead()
+		return rv.(*User), err
 	}
 
-	// TODO(mustRevalidate, noStore)
-	var v *User
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &v, dbRead, false, false)
+	var rv *User
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return v, err
 
+	// invalidate
+	invalidateErr := q.db.PostExec(func() error {
+		var anyErr error
+		if getUserByID != nil {
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetUserByID:%+v", *getUserByID))
+			if err != nil {
+				anyErr = err
+			}
+		}
+		if getUserByName != nil {
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetUserByName:%+v", *getUserByName))
+			if err != nil {
+				anyErr = err
+			}
+		}
+		return anyErr
+	})
+	if invalidateErr != nil {
+		// invalidateErr is ignored for now.
+	}
+
+	return rv, err
 }
 
 const deleteAuthor = `-- name: DeleteAuthor :exec
@@ -129,10 +152,35 @@ DELETE FROM Users
 WHERE id = $1
 `
 
-// -- invalidate : [GetUserByID, GetUserByName]
-func (q *Queries) DeleteAuthor(ctx context.Context, id int32) error {
+// -- invalidate : [GetUserByID, ListUsers]
+func (q *Queries) DeleteAuthor(ctx context.Context, id int32, getUserByID1 *int32, listUsers *ListUsersParams) error {
 	_, err := q.db.WExec(ctx, "DeleteAuthor", deleteAuthor, id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// invalidate
+	invalidateErr := q.db.PostExec(func() error {
+		var anyErr error
+		if getUserByID1 != nil {
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetUserByID:%+v", *getUserByID1))
+			if err != nil {
+				anyErr = err
+			}
+		}
+		if listUsers != nil {
+			err = q.cache.Invalidate(ctx, listUsers.CacheKey())
+			if err != nil {
+				anyErr = err
+			}
+		}
+		return anyErr
+	})
+	if invalidateErr != nil {
+		// invalidateErr is ignored for now.
+	}
+
+	return nil
 }
 
 const getUserByID = `-- name: GetUserByID :one
@@ -142,9 +190,11 @@ WHERE id = $1 LIMIT 1
 
 // -- cache : 5m
 func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
+	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
-		row := q.db.WQueryRow(ctx, "GetUserByID", getUserByID, id)
+		row := q.db.WQueryRow(ctx, "GetUserByID", getUserByID,
+			id)
 		i := &User{}
 		err := row.Scan(
 			&i.ID,
@@ -159,18 +209,17 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		v, _, err := dbRead()
-		return v.(*User), err
+		rv, _, err := dbRead()
+		return rv.(*User), err
 	}
 
-	// TODO(mustRevalidate, noStore)
-	var v *User
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByID:%+v", id), &v, dbRead, false, false)
+	var rv *User
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByID:%+v", id), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return v, err
 
+	return rv, err
 }
 
 const getUserByName = `-- name: GetUserByName :one
@@ -180,9 +229,11 @@ WHERE Name = $1 LIMIT 1
 
 // -- cache : 5m
 func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error) {
+	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
-		row := q.db.WQueryRow(ctx, "GetUserByName", getUserByName, name)
+		row := q.db.WQueryRow(ctx, "GetUserByName", getUserByName,
+			name)
 		i := &User{}
 		err := row.Scan(
 			&i.ID,
@@ -197,18 +248,17 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		v, _, err := dbRead()
-		return v.(*User), err
+		rv, _, err := dbRead()
+		return rv.(*User), err
 	}
 
-	// TODO(mustRevalidate, noStore)
-	var v *User
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByName:%+v", name), &v, dbRead, false, false)
+	var rv *User
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByName:%+v", name), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return v, err
 
+	return rv, err
 }
 
 const listUserNames = `-- name: ListUserNames :many
@@ -266,6 +316,7 @@ func (q *Queries) ListUserNames(ctx context.Context, arg ListUserNamesParams) ([
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }
 
@@ -325,5 +376,6 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }
