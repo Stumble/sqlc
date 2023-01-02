@@ -30,7 +30,7 @@ INSERT INTO Users (
 RETURNING *;
 
 -- name: DeleteAuthor :exec
--- -- invalidate : [GetUserByID, GetUserByName]
+-- -- invalidate : [GetUserByID, ListUsers]
 DELETE FROM Users
 WHERE id = $1;
 
