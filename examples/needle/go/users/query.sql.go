@@ -7,6 +7,7 @@ package users
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgtype"
@@ -62,7 +63,7 @@ func (q *Queries) Complicated(ctx context.Context, n int32) ([]pgtype.Numeric, e
 
 	// TODO(mustRevalidate, noStore)
 	var items []pgtype.Numeric
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("Complicated:%+v", n), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +83,12 @@ type CreateAuthorParams struct {
 	Name      string
 	Metadata  []byte
 	Thumbnail string
+}
+
+// CacheKey - cache key
+func (arg CreateAuthorParams) CacheKey() string {
+	prefix := "CreateAuthor:"
+	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.Name, arg.Metadata, arg.Thumbnail)
 }
 
 // -- invalidate : [GetUserByID, GetUserByName]
@@ -109,7 +116,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Us
 
 	// TODO(mustRevalidate, noStore)
 	var v *User
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +165,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 
 	// TODO(mustRevalidate, noStore)
 	var v *User
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByID:%+v", id), &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +203,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 
 	// TODO(mustRevalidate, noStore)
 	var v *User
-	err := q.cache.GetWithTtl(ctx, "TODO", &v, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByName:%+v", name), &v, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -214,6 +221,12 @@ LIMIT $2
 type ListUserNamesParams struct {
 	After int32
 	First int32
+}
+
+// CacheKey - cache key
+func (arg ListUserNamesParams) CacheKey() string {
+	prefix := "ListUserNames:"
+	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
 }
 
 type ListUserNamesRow struct {
@@ -249,7 +262,7 @@ func (q *Queries) ListUserNames(ctx context.Context, arg ListUserNamesParams) ([
 
 	// TODO(mustRevalidate, noStore)
 	var items []ListUserNamesRow
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -266,6 +279,12 @@ LIMIT $2
 type ListUsersParams struct {
 	After int32
 	First int32
+}
+
+// CacheKey - cache key
+func (arg ListUsersParams) CacheKey() string {
+	prefix := "ListUsers:"
+	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
@@ -302,7 +321,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 
 	// TODO(mustRevalidate, noStore)
 	var items []User
-	err := q.cache.GetWithTtl(ctx, "TODO", &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
