@@ -35,9 +35,11 @@ func (arg CreateAuthorParams) CacheKey() string {
 }
 
 func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Order, error) {
+	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 0)
-		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Userid, arg.Itemid)
+		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor,
+			arg.Userid, arg.Itemid)
 		i := &Order{}
 		err := row.Scan(
 			&i.ID,
@@ -52,18 +54,17 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		v, _, err := dbRead()
-		return v.(*Order), err
+		rv, _, err := dbRead()
+		return rv.(*Order), err
 	}
 
-	// TODO(mustRevalidate, noStore)
-	var v *Order
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &v, dbRead, false, false)
+	var rv *Order
+	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return v, err
 
+	return rv, err
 }
 
 const deleteOrder = `-- name: DeleteOrder :exec
@@ -76,7 +77,11 @@ WHERE
 
 func (q *Queries) DeleteOrder(ctx context.Context, id int32) error {
 	_, err := q.db.WExec(ctx, "DeleteOrder", deleteOrder, id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
@@ -116,6 +121,7 @@ type GetOrderByIDRow struct {
 
 // -- cache : 10m
 func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
+	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 600000)
 		row := q.db.WQueryRow(ctx, "GetOrderByID", getOrderByID)
@@ -139,18 +145,17 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		v, _, err := dbRead()
-		return v.(*GetOrderByIDRow), err
+		rv, _, err := dbRead()
+		return rv.(*GetOrderByIDRow), err
 	}
 
-	// TODO(mustRevalidate, noStore)
-	var v *GetOrderByIDRow
-	err := q.cache.GetWithTtl(ctx, "GetOrderByID", &v, dbRead, false, false)
+	var rv *GetOrderByIDRow
+	err := q.cache.GetWithTtl(ctx, "GetOrderByID", &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return v, err
 
+	return rv, err
 }
 
 const listOrdersByGender = `-- name: ListOrdersByGender :many
@@ -215,6 +220,7 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }
 
@@ -276,5 +282,6 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 	if err != nil {
 		return nil, err
 	}
+
 	return items, err
 }

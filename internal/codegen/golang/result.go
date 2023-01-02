@@ -270,6 +270,48 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 	return qs, nil
 }
 
+func buildQueryInvalidates(queries []Query) {
+	qmap := make(map[string]*Query)
+	for i := range queries {
+		qmap[queries[i].MethodName] = &queries[i]
+	}
+
+	argNames := make(map[string]bool)
+	for i := range queries {
+		q := &queries[i]
+		for _, toInvalidateName := range q.Option.Invalidates {
+			query := qmap[toInvalidateName]
+			argName := sdk.LowerTitle(query.MethodName)
+			if argNames[argName] {
+				i := 0
+				for {
+					i++
+					indexedName := fmt.Sprintf("%s%d", argName, i)
+					if !argNames[indexedName] {
+						argName = indexedName
+						break
+					}
+				}
+			}
+			cacheKey := genCacheKeyWithArgName(*query, argName, true)
+			if q.Arg.isEmpty() {
+				q.Invalidates = append(q.Invalidates, InvalidateParam{
+					Q:        query,
+					NoArg:    true,
+					CacheKey: cacheKey,
+				})
+			} else {
+				argNames[argName] = true
+				q.Invalidates = append(q.Invalidates, InvalidateParam{
+					Q:        query,
+					ArgName:  argName,
+					CacheKey: cacheKey,
+				})
+			}
+		}
+	}
+}
+
 func putOutColumns(query *plugin.Query) bool {
 	if len(query.Columns) > 0 {
 		return true

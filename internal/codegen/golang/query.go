@@ -183,6 +183,7 @@ type Query struct {
 	Ret          QueryValue
 	Arg          QueryValue
 	Option       WPgxOption
+	Invalidates  []InvalidateParam
 	// Used for :copyfrom
 	Table *plugin.Identifier
 }
@@ -205,16 +206,45 @@ func (q Query) TableIdentifier() string {
 
 // CacheKey is used by WPgx only.
 func (q Query) CacheKey() string {
+	return genCacheKeyWithArgName(q, q.Arg.Name, q.Arg.IsPointer())
+}
+
+// InvalidateArgs is used by WPgx only.
+func (q Query) InvalidateArgs() string {
+	rv := ""
+	if !q.Arg.isEmpty() {
+		rv = ", "
+	}
+	for _, inv := range q.Invalidates {
+		if inv.NoArg {
+			continue
+		}
+		t := inv.Q.Arg.Type()
+		if !inv.Q.Arg.IsPointer() && !strings.HasPrefix(t, "[]") {
+			t = "*" + t
+		}
+		rv += fmt.Sprintf("%s %s,", inv.ArgName, t)
+	}
+	return rv
+}
+
+func genCacheKeyWithArgName(q Query, argName string, isPointer bool) string {
 	if q.Arg.isEmpty() {
 		return `"` + q.MethodName + `"`
 	}
 	if q.Arg.Struct == nil {
-		argName := q.Arg.Name
-		if q.Arg.IsPointer() {
+		if isPointer {
 			argName = "*" + argName
 		}
 		return `fmt.Sprintf("` + q.MethodName + `:%+v",` + argName + `)`
 	} else {
-		return q.Arg.Name + `.CacheKey()`
+		return argName + `.CacheKey()`
 	}
+}
+
+type InvalidateParam struct {
+	Q        *Query
+	NoArg    bool
+	ArgName  string
+	CacheKey string
 }
