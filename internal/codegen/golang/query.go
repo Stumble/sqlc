@@ -197,6 +197,10 @@ func (v QueryValue) CacheKeySprintf() string {
 	format := make([]string, 0)
 	args := make([]string, 0)
 	for _, f := range v.Struct.Fields {
+		// TODO(yumin): pointer not supported for now.
+		if strings.Contains(v.Typ, "*") {
+			panic(fmt.Errorf("pointer arguments query cache not supported: %+v", v))
+		}
 		if strings.HasPrefix(v.Typ, "[]*") {
 			panic(fmt.Errorf("[]*T typed arguments query cache not supported: %+v", v))
 		}
