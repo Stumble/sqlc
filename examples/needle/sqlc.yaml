@@ -20,7 +20,7 @@ sql:
     go: 
       sql_package: "wpgx"
       package: "users"
-      out: "go/users"
+      out: "users"
 - schema: "items/schema.sql"
   queries: "items/query.sql"
   engine: "postgresql"
@@ -28,7 +28,7 @@ sql:
     go: 
       sql_package: "wpgx"
       package: "items"
-      out: "go/items"
+      out: "items"
 - schema: ["orders/schema.sql", "items/schema.sql", "users/schema.sql"]
   queries: "orders/query.sql"
   engine: "postgresql"
@@ -36,4 +36,4 @@ sql:
     go: 
       sql_package: "wpgx"
       package: "orders"
-      out: "go/orders"
+      out: "orders"
