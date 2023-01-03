@@ -31,7 +31,7 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 		return err
 	}
 	merr := multierr.New()
-	for _, filename := range files {
+	for i, filename := range files {
 		blob, err := os.ReadFile(filename)
 		if err != nil {
 			merr.Add(filename, "", 0, err)
@@ -48,6 +48,14 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 				merr.Add(filename, contents, stmts[i].Pos(), err)
 				continue
 			}
+		}
+		// XXX(yumin): only the first schema file is added.
+		// TODO(yumin): allow more schema to be added and filter them by the type of SQL.
+		// For example,
+		// + type/function declaration: does not support IF NOT EXISTS by default.
+		// + table/partition declaration: okay to duplicated by using IF NOT EXISTS.
+		if i == 0 {
+			c.catalog.AddRawSQL(contents)
 		}
 	}
 	if len(merr.Errs()) > 0 {

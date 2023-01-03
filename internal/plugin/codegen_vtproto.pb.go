@@ -252,6 +252,11 @@ func (m *Catalog) CloneVT() *Catalog {
 		}
 		r.Schemas = tmpContainer
 	}
+	if rhs := m.RawSqls; rhs != nil {
+		tmpContainer := make([]string, len(rhs))
+		copy(tmpContainer, rhs)
+		r.RawSqls = tmpContainer
+	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -983,6 +988,15 @@ func (this *Catalog) EqualVT(that *Catalog) bool {
 			if !p.EqualVT(q) {
 				return false
 			}
+		}
+	}
+	if len(this.RawSqls) != len(that.RawSqls) {
+		return false
+	}
+	for i, vx := range this.RawSqls {
+		vy := that.RawSqls[i]
+		if vx != vy {
+			return false
 		}
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -2318,6 +2332,15 @@ func (m *Catalog) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.RawSqls) > 0 {
+		for iNdEx := len(m.RawSqls) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.RawSqls[iNdEx])
+			copy(dAtA[i:], m.RawSqls[iNdEx])
+			i = encodeVarint(dAtA, i, uint64(len(m.RawSqls[iNdEx])))
+			i--
+			dAtA[i] = 0x2a
+		}
 	}
 	if len(m.Schemas) > 0 {
 		for iNdEx := len(m.Schemas) - 1; iNdEx >= 0; iNdEx-- {
@@ -4083,6 +4106,15 @@ func (m *Catalog) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if len(m.RawSqls) > 0 {
+		for iNdEx := len(m.RawSqls) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.RawSqls[iNdEx])
+			copy(dAtA[i:], m.RawSqls[iNdEx])
+			i = encodeVarint(dAtA, i, uint64(len(m.RawSqls[iNdEx])))
+			i--
+			dAtA[i] = 0x2a
+		}
+	}
 	if len(m.Schemas) > 0 {
 		for iNdEx := len(m.Schemas) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.Schemas[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
@@ -5366,6 +5398,12 @@ func (m *Catalog) SizeVT() (n int) {
 	if len(m.Schemas) > 0 {
 		for _, e := range m.Schemas {
 			l = e.SizeVT()
+			n += 1 + l + sov(uint64(l))
+		}
+	}
+	if len(m.RawSqls) > 0 {
+		for _, s := range m.RawSqls {
+			l = len(s)
 			n += 1 + l + sov(uint64(l))
 		}
 	}
@@ -8085,6 +8123,38 @@ func (m *Catalog) UnmarshalVT(dAtA []byte) error {
 			if err := m.Schemas[len(m.Schemas)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RawSqls", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RawSqls = append(m.RawSqls, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

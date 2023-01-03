@@ -204,6 +204,7 @@ func pluginCatalog(c *catalog.Catalog) *plugin.Catalog {
 		DefaultSchema: c.DefaultSchema,
 		Comment:       c.Comment,
 		Schemas:       schemas,
+		RawSqls:       c.RawSQLs,
 	}
 }
 

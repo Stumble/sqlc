@@ -17,6 +17,7 @@
    `SELECT * FROM table ORDER BY some_primary_key` with name "Dump" and type as ":many". 
    And Load query must be like `INSERT INTO table (.*) VALUES ($1, $2...);` with name "Load"
    and type as ":exec".
+6. ``` backtick symbol is prohibited in schema.sql file.
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:
