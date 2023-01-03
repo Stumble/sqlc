@@ -126,14 +126,14 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 		return nil, err
 	}
 	tctx := tmplCtx{
-		EmitInterface:             golang.EmitInterface,
-		EmitJSONTags:              golang.EmitJsonTags,
-		EmitDBTags:                golang.EmitDbTags,
-		EmitPreparedQueries:       golang.EmitPreparedQueries,
-		EmitEmptySlices:           golang.EmitEmptySlices,
-		EmitMethodsWithDBArgument: golang.EmitMethodsWithDbArgument,
-		EmitEnumValidMethod:       golang.EmitEnumValidMethod,
-		EmitAllEnumValues:         golang.EmitAllEnumValues,
+		EmitInterface:             false,
+		EmitJSONTags:              true,
+		EmitDBTags:                false,
+		EmitPreparedQueries:       false,
+		EmitEmptySlices:           false,
+		EmitMethodsWithDBArgument: false,
+		EmitEnumValidMethod:       true,
+		EmitAllEnumValues:         true,
 		UsesCopyFrom:              usesCopyFrom(queries),
 		UsesBatch:                 usesBatch(queries),
 		SQLDriver:                 parseDriver(golang.SqlPackage),
