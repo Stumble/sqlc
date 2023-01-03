@@ -109,6 +109,7 @@ message Catalog
   string default_schema = 2;
   string name = 3;
   repeated Schema schemas = 4;
+  repeated string raw_sqls = 5;
 }
 
 message Schema

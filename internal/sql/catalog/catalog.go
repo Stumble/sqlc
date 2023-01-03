@@ -7,6 +7,7 @@ import (
 // Catalog describes a database instance consisting of metadata in which database objects are defined
 type Catalog struct {
 	Comment       string
+	RawSQLs       []string
 	DefaultSchema string
 	Name          string
 	Schemas       []*Schema
@@ -136,4 +137,8 @@ func (c *Catalog) Update(stmt ast.Statement, colGen columnGenerator) error {
 
 	}
 	return err
+}
+
+func (c *Catalog) AddRawSQL(sql string) {
+	c.RawSQLs = append(c.RawSQLs, sql)
 }

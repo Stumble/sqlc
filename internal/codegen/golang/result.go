@@ -10,6 +10,8 @@ import (
 	"github.com/kyleconroy/sqlc/internal/inflection"
 	"github.com/kyleconroy/sqlc/internal/metadata"
 	"github.com/kyleconroy/sqlc/internal/plugin"
+
+	"golang.org/x/exp/constraints"
 )
 
 var (
@@ -500,4 +502,45 @@ func checkIncompatibleFieldTypes(fields []Field) error {
 		}
 	}
 	return nil
+}
+
+func verifyRawSQLs(sqls []string) error {
+	for _, s := range sqls {
+		idx := strings.Index(s, "`")
+		if idx != -1 {
+			start := max([]int{idx - 20, 0})
+			end := min([]int{idx + 20, len(s)})
+			return fmt.Errorf("Use backtick symbol ` in schema file is prohibited: %s",
+				s[start:end])
+		}
+	}
+	return nil
+}
+
+func max[T constraints.Ordered](s []T) T {
+    if len(s) == 0 {
+        var zero T
+        return zero
+    }
+    m := s[0]
+    for _, v := range s {
+        if m < v {
+            m = v
+        }
+    }
+    return m
+}
+
+func min[T constraints.Ordered](s []T) T {
+    if len(s) == 0 {
+        var zero T
+        return zero
+    }
+    m := s[0]
+    for _, v := range s {
+        if m > v {
+            m = v
+        }
+    }
+    return m
 }

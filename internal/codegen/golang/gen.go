@@ -16,14 +16,15 @@ import (
 )
 
 type tmplCtx struct {
-	Q           string
-	Package     string
-	SQLDriver   SQLDriver
-	Enums       []Enum
-	Structs     []Struct
-	GoQueries   []Query
-	SqlcVersion string
-	DumpLoader  *DumpLoader
+	Q            string
+	Package      string
+	SQLDriver    SQLDriver
+	Enums        []Enum
+	Structs      []Struct
+	GoQueries    []Query
+	SqlcVersion  string
+	DumpLoader   *DumpLoader
+	RawSchemaSQL string
 
 	// TODO: Race conditions
 	SourceName string
@@ -109,6 +110,10 @@ func Generate(ctx context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenR
 		return nil, err
 	}
 	buildQueryInvalidates(queries)
+	err = verifyRawSQLs(req.Catalog.RawSqls)
+	if err != nil {
+		return nil, err
+	}
 	return generate(req, enums, structs, queries)
 }
 
@@ -143,6 +148,7 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 		Structs:                   structs,
 		SqlcVersion:               req.SqlcVersion,
 		DumpLoader:                dumploader,
+		RawSchemaSQL:              strings.Join(req.Catalog.GetRawSqls(), "\n"),
 	}
 
 	if tctx.UsesCopyFrom && !tctx.SQLDriver.IsPGX() {
