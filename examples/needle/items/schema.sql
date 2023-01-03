@@ -24,7 +24,7 @@ PARTITION OF Items FOR VALUES
 FROM (0) TO (1000);
 
 -- local index on (Name)
-CREATE INDEX items_name
+CREATE INDEX IF NOT EXISTS items_id_le_1000_name_idx
 ON items_id_le_1000 (Name);
 
 -- global index on created_at
