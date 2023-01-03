@@ -29,3 +29,10 @@ RETURNING *;
 -- -- invalidate : [GetItemByID, ListItems]
 DELETE FROM Items
 WHERE id = $1;
+
+
+-- -- name: FakeLoad :exec
+-- INSERT INTO items (id,name,description,category,price,thumbnail,metadata,createdat,updatedat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+
+-- -- name: FakeDump :many
+-- SELECT id,name,description,category,price,thumbnail,metadata,createdat,updatedat FROM items Order by id,name,description,category,price,thumbnail,metadata,createdat,updatedat ASC;

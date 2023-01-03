@@ -236,4 +236,51 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 
 {{end}}
 {{end}}
+
+//// auto generated functions
+
+func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
+	sql := "{{.DumpLoader.DumpSQL}}"
+	rows, err := q.db.WQuery(ctx, "Dump", sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []{{.DumpLoader.MainStructName}}
+	for rows.Next() {
+		var v {{.DumpLoader.MainStructName}}
+		if err := rows.Scan({{.DumpLoader.Fields "&v."}}); err != nil {
+			return nil, err
+		}
+		for _, applyBeforeDump := range beforeDump {
+			applyBeforeDump(&v)
+		}
+		items = append(items, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	bytes, err := json.MarshalIndent(items, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
+func (q *Queries) Load(ctx context.Context, data []byte) error {
+    sql := "{{.DumpLoader.LoadSQL}}"
+	rows := make([]{{.DumpLoader.MainStructName}}, 0)
+	err := json.Unmarshal(data, &rows)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		_, err := q.db.WExec(ctx, "Load", sql, {{.DumpLoader.Fields "row."}})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 {{end}}

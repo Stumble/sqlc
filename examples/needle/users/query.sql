@@ -1,5 +1,5 @@
 -- name: GetUserByID :one
--- -- cache : 5m
+-- -- cache : 30s
 SELECT * FROM Users
 WHERE id = $1 LIMIT 1;
 
@@ -34,7 +34,7 @@ RETURNING *;
 DELETE FROM Users
 WHERE id = $1;
 
--- name: Complicated :many
+-- name: Complicated :one
 -- -- cache : 1m
 -- example of sqlc cannot handle recursive query.
 WITH RECURSIVE fibonacci(n,x,y) AS (
