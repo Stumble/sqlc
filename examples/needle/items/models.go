@@ -57,6 +57,28 @@ func (ns NullItemcategory) Value() (driver.Value, error) {
 	return string(ns.Itemcategory), nil
 }
 
+func (e Itemcategory) Valid() bool {
+	switch e {
+	case ItemcategoryALCOHOL,
+		ItemcategoryDRUG,
+		ItemcategoryDRINK,
+		ItemcategoryFRUIT,
+		ItemcategoryVEGETABLE:
+		return true
+	}
+	return false
+}
+
+func AllItemcategoryValues() []Itemcategory {
+	return []Itemcategory{
+		ItemcategoryALCOHOL,
+		ItemcategoryDRUG,
+		ItemcategoryDRINK,
+		ItemcategoryFRUIT,
+		ItemcategoryVEGETABLE,
+	}
+}
+
 type Item struct {
 	ID          int64          `json:"id"`
 	Name        string         `json:"name"`
