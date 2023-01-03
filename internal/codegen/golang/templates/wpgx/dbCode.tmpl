@@ -51,4 +51,8 @@ func (q *Queries) WithCache(cache Cache) *Queries {
 		cache: cache,
 	}
 }
+
+var Schema = `
+{{.RawSchemaSQL}}
+`
 {{end}}
