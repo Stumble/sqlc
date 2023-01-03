@@ -7,6 +7,7 @@ package orders
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -282,4 +283,50 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 	}
 
 	return items, err
+}
+
+//// auto generated functions
+
+func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
+	sql := "SELECT id,userid,itemid,createdat,isdeleted FROM orders ORDER BY id,userid,itemid,createdat,isdeleted ASC;"
+	rows, err := q.db.WQuery(ctx, "Dump", sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Order
+	for rows.Next() {
+		var v Order
+		if err := rows.Scan(&v.ID, &v.Userid, &v.Itemid, &v.CreatedAt, &v.Isdeleted); err != nil {
+			return nil, err
+		}
+		for _, applyBeforeDump := range beforeDump {
+			applyBeforeDump(&v)
+		}
+		items = append(items, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	bytes, err := json.MarshalIndent(items, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
+func (q *Queries) Load(ctx context.Context, data []byte) error {
+	sql := "INSERT INTO orders (id,userid,itemid,createdat,isdeleted) VALUES ($1,$2,$3,$4,$5);"
+	rows := make([]Order, 0)
+	err := json.Unmarshal(data, &rows)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		_, err := q.db.WExec(ctx, "Load", sql, row.ID, row.Userid, row.Itemid, row.CreatedAt, row.Isdeleted)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

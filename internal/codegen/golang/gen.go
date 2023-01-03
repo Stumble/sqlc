@@ -23,6 +23,7 @@ type tmplCtx struct {
 	Structs     []Struct
 	GoQueries   []Query
 	SqlcVersion string
+	DumpLoader  *DumpLoader
 
 	// TODO: Race conditions
 	SourceName string
@@ -81,6 +82,10 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 	)
 
 	golang := req.Settings.Go
+	dumploader, err := buildDumpLoader(structs)
+	if err != nil {
+		return nil, err
+	}
 	tctx := tmplCtx{
 		EmitInterface:             golang.EmitInterface,
 		EmitJSONTags:              golang.EmitJsonTags,
@@ -99,6 +104,7 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 		Enums:                     enums,
 		Structs:                   structs,
 		SqlcVersion:               req.SqlcVersion,
+		DumpLoader:                dumploader,
 	}
 
 	if tctx.UsesCopyFrom && !tctx.SQLDriver.IsPGX() {
