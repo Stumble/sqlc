@@ -12,6 +12,16 @@ import (
 	"github.com/kyleconroy/sqlc/internal/plugin"
 )
 
+var (
+	reservedNames = make(map[string]bool)
+)
+
+func init() {
+	reservedNames["load"] = true
+	reservedNames["dump"] = true
+	reservedNames["check"] = true
+}
+
 func buildEnums(req *plugin.CodeGenRequest) []Enum {
 	var enums []Enum
 	for _, schema := range req.Catalog.Schemas {
@@ -92,6 +102,7 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				addExtraGoStructTags(tags, req, column)
 				s.Fields = append(s.Fields, Field{
 					Name:    StructName(column.Name, req.Settings),
+					DBName:  column.Name,
 					Type:    goType(req, column),
 					Tags:    tags,
 					Comment: column.Comment,
@@ -152,6 +163,11 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 		}
 		if query.Cmd == "" {
 			continue
+		}
+
+		if reservedNames[strings.ToLower(query.Name)] {
+			return nil, fmt.Errorf(
+				"Query name %s is reserved word, please change it", query.Name)
 		}
 
 		var constantName string
@@ -310,6 +326,13 @@ func buildQueryInvalidates(queries []Query) {
 			}
 		}
 	}
+}
+
+func buildDumpLoader(structs []Struct) (*DumpLoader, error) {
+	if len(structs) == 0 {
+		return nil, fmt.Errorf("Cannot find main struct")
+	}
+	return &DumpLoader{MainStruct: &structs[0]}, nil
 }
 
 func putOutColumns(query *plugin.Query) bool {

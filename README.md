@@ -12,7 +12,11 @@
    value, and it is not known whether two unknown values are equal.), You should never pass
    a nil pointer to the function argument in a select query where condition.
    Also unlike needle, cache for query with parameters having pointer fields is not supported.
-5. Add Check(), Load(), Dump() function to query, just like needle.
+5. User must explicitly add two queries: Load, Dump. Needle can automatically generate them,
+   but currently sqlc cannot. Dump query should always be like 
+   `SELECT * FROM table ORDER BY some_primary_key` with name "Dump" and type as ":many". 
+   And Load query must be like `INSERT INTO table (.*) VALUES ($1, $2...);` with name "Load"
+   and type as ":exec".
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:

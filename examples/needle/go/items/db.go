@@ -25,6 +25,9 @@ type WGConn interface {
 
 type ReadWithTtlFunc = func() (any, time.Duration, error)
 
+// BeforeDump allows you to edit result before dump.
+type BeforeDump func(m *Item)
+
 type Cache interface {
 	GetWithTtl(
 		ctx context.Context, key string, target any,

@@ -7,6 +7,7 @@ package items
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -329,4 +330,50 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 	}
 
 	return items, err
+}
+
+//// auto generated functions
+
+func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
+	sql := "SELECT id,name,description,category,price,thumbnail,metadata,createdat,updatedat FROM items ORDER BY id,name,description,category,price,thumbnail,metadata,createdat,updatedat ASC;"
+	rows, err := q.db.WQuery(ctx, "Dump", sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Item
+	for rows.Next() {
+		var v Item
+		if err := rows.Scan(&v.ID, &v.Name, &v.Description, &v.Category, &v.Price, &v.Thumbnail, &v.Metadata, &v.CreatedAt, &v.UpdatedAt); err != nil {
+			return nil, err
+		}
+		for _, applyBeforeDump := range beforeDump {
+			applyBeforeDump(&v)
+		}
+		items = append(items, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	bytes, err := json.MarshalIndent(items, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
+func (q *Queries) Load(ctx context.Context, data []byte) error {
+	sql := "INSERT INTO items (id,name,description,category,price,thumbnail,metadata,createdat,updatedat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);"
+	rows := make([]Item, 0)
+	err := json.Unmarshal(data, &rows)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		_, err := q.db.WExec(ctx, "Load", sql, row.ID, row.Name, row.Description, row.Category, row.Price, row.Thumbnail, row.Metadata, row.CreatedAt, row.UpdatedAt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
