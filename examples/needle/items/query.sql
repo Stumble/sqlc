@@ -30,6 +30,12 @@ RETURNING *;
 DELETE FROM Items
 WHERE id = $1;
 
+-- name: BulkInsert :copyfrom
+INSERT INTO items (
+  Name, Description, Category, Price, Thumbnail, Metadata
+) VALUES (
+  $1, $2, $3, $4, $5, $6
+);
 
 -- -- name: FakeLoad :exec
 -- INSERT INTO items (id,name,description,category,price,thumbnail,metadata,createdat,updatedat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);

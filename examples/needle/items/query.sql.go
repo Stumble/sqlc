@@ -15,6 +15,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type BulkInsertParams struct {
+	Name        string
+	Description string
+	Category    Itemcategory
+	Price       pgtype.Numeric
+	Thumbnail   string
+	Metadata    []byte
+}
+
 const createItems = `-- name: CreateItems :one
 INSERT INTO Items (
   Name, Description, Category, Price, Thumbnail, Metadata
