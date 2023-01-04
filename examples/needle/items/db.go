@@ -20,6 +20,8 @@ type WGConn interface {
 		ctx context.Context, name string, unprepared string, args ...interface{}) pgx.Row
 	WExec(
 		ctx context.Context, name string, unprepared string, args ...interface{}) (pgconn.CommandTag, error)
+	WCopyFrom(ctx context.Context, name string, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
+
 	PostExec(f wpgx.PostExecFunc) error
 }
 
