@@ -20,6 +20,7 @@ type WGConn interface {
 		ctx context.Context, name string, unprepared string, args ...interface{}) pgx.Row
 	WExec(
 		ctx context.Context, name string, unprepared string, args ...interface{}) (pgconn.CommandTag, error)
+
 	PostExec(f wpgx.PostExecFunc) error
 }
 
