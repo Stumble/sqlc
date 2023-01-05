@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -19,8 +18,8 @@ const complicated = `-- name: Complicated :one
 WITH RECURSIVE fibonacci(n,x,y) AS (
 	SELECT
     	1 AS n ,
-  		0 :: NUMERIC AS x,
-    	1 :: NUMERIC AS y
+  		0 :: int AS x,
+    	1 :: int AS y
   	UNION ALL
   	SELECT
     	n + 1 AS n,
@@ -36,13 +35,13 @@ FROM fibonacci
 
 // -- cache : 1m
 // example of sqlc cannot handle recursive query.
-func (q *Queries) Complicated(ctx context.Context, n int32) (*pgtype.Numeric, error) {
+func (q *Queries) Complicated(ctx context.Context, n int32) (*int32, error) {
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 60000)
 		row := q.db.WQueryRow(ctx, "Complicated", complicated,
 			n)
-		x := &pgtype.Numeric{}
+		var x int32
 		err := row.Scan(&x)
 		if err == pgx.ErrNoRows {
 			return nil, cacheDuration, nil
@@ -51,10 +50,10 @@ func (q *Queries) Complicated(ctx context.Context, n int32) (*pgtype.Numeric, er
 	}
 	if q.cache == nil {
 		rv, _, err := dbRead()
-		return rv.(*pgtype.Numeric), err
+		return rv.(*int32), err
 	}
 
-	var rv *pgtype.Numeric
+	var rv *int32
 	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("Complicated:%+v", n), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
@@ -91,7 +90,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams, getU
 		cacheDuration := time.Duration(time.Millisecond * 0)
 		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor,
 			arg.Name, arg.Metadata, arg.Thumbnail)
-		i := &User{}
+		var i User
 		err := row.Scan(
 			&i.ID,
 			&i.Name,
@@ -187,7 +186,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 		cacheDuration := time.Duration(time.Millisecond * 30000)
 		row := q.db.WQueryRow(ctx, "GetUserByID", getUserByID,
 			id)
-		i := &User{}
+		var i User
 		err := row.Scan(
 			&i.ID,
 			&i.Name,
@@ -226,7 +225,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 		cacheDuration := time.Duration(time.Millisecond * 300000)
 		row := q.db.WQueryRow(ctx, "GetUserByName", getUserByName,
 			name)
-		i := &User{}
+		var i User
 		err := row.Scan(
 			&i.ID,
 			&i.Name,

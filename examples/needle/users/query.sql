@@ -40,8 +40,8 @@ WHERE id = $1;
 WITH RECURSIVE fibonacci(n,x,y) AS (
 	SELECT
     	1 AS n ,
-  		0 :: NUMERIC AS x,
-    	1 :: NUMERIC AS y
+  		0 :: int AS x,
+    	1 :: int AS y
   	UNION ALL
   	SELECT
     	n + 1 AS n,
