@@ -81,7 +81,7 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item
 			&i.UpdatedAt,
 		)
 		if err == pgx.ErrNoRows {
-			return nil, cacheDuration, nil
+			return (*Item)(nil), cacheDuration, nil
 		}
 		return i, cacheDuration, err
 	}
@@ -160,7 +160,7 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 			&i.UpdatedAt,
 		)
 		if err == pgx.ErrNoRows {
-			return nil, cacheDuration, nil
+			return (*Item)(nil), cacheDuration, nil
 		}
 		return i, cacheDuration, err
 	}
