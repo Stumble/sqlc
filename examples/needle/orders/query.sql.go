@@ -50,7 +50,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 			&i.Isdeleted,
 		)
 		if err == pgx.ErrNoRows {
-			return nil, cacheDuration, nil
+			return (*Order)(nil), cacheDuration, nil
 		}
 		return i, cacheDuration, err
 	}
@@ -141,7 +141,7 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 			&i.Itemmetadata,
 		)
 		if err == pgx.ErrNoRows {
-			return nil, cacheDuration, nil
+			return (*GetOrderByIDRow)(nil), cacheDuration, nil
 		}
 		return i, cacheDuration, err
 	}
