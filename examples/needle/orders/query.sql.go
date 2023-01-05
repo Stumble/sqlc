@@ -41,7 +41,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 		cacheDuration := time.Duration(time.Millisecond * 0)
 		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor,
 			arg.Userid, arg.Itemid)
-		i := &Order{}
+		var i Order
 		err := row.Scan(
 			&i.ID,
 			&i.Userid,
@@ -126,7 +126,7 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 600000)
 		row := q.db.WQueryRow(ctx, "GetOrderByID", getOrderByID)
-		i := &GetOrderByIDRow{}
+		var i GetOrderByIDRow
 		err := row.Scan(
 			&i.ID,
 			&i.Userid,

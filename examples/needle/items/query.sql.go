@@ -68,7 +68,7 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item
 			arg.Thumbnail,
 			arg.Metadata,
 		)
-		i := &Item{}
+		var i Item
 		err := row.Scan(
 			&i.ID,
 			&i.Name,
@@ -147,7 +147,7 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
 		row := q.db.WQueryRow(ctx, "GetItemByID", getItemByID,
 			id)
-		i := &Item{}
+		var i Item
 		err := row.Scan(
 			&i.ID,
 			&i.Name,
