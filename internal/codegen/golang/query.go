@@ -227,6 +227,7 @@ func (v QueryValue) CacheKeySprintf() string {
 type Query struct {
 	Cmd          string
 	Comments     []string
+	Pkg          string
 	MethodName   string
 	FieldName    string
 	ConstantName string
@@ -258,7 +259,7 @@ func (q Query) TableIdentifier() string {
 
 // CacheKey is used by WPgx only.
 func (q Query) CacheKey() string {
-	return genCacheKeyWithArgName(q, q.Arg.Name, q.Arg.IsPointer())
+	return genCacheKeyWithArgName(q.Pkg, q, q.Arg.Name, q.Arg.IsPointer())
 }
 
 // InvalidateArgs is used by WPgx only.
@@ -280,15 +281,19 @@ func (q Query) InvalidateArgs() string {
 	return rv
 }
 
-func genCacheKeyWithArgName(q Query, argName string, isPointer bool) string {
+func genCacheKeyWithArgName(pkg string, q Query, argName string, isPointer bool) string {
+	if len(pkg) == 0 {
+		panic("empty pkg name is invalid")
+	}
+	prefix := pkg + ":" + q.MethodName;
 	if q.Arg.isEmpty() {
-		return `"` + q.MethodName + `"`
+		return `"` + prefix + `"`
 	}
 	if q.Arg.Struct == nil {
 		if isPointer {
 			argName = "*" + argName
 		}
-		return `fmt.Sprintf("` + q.MethodName + `:%+v",` + argName + `)`
+		return `fmt.Sprintf("` + prefix + `:%+v",` + argName + `)`
 	} else {
 		return argName + `.CacheKey()`
 	}
