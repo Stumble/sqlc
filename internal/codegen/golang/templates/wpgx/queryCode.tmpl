@@ -17,7 +17,7 @@ type {{.Arg.Type}} struct { {{- range .Arg.Struct.Fields}}
 {{if (ne .Cmd ":copyfrom")}}
 // CacheKey - cache key
 func ({{.Arg.Name}} {{.Arg.Type}}) CacheKey() string {
-    prefix := "{{.MethodName}}:"
+    prefix := "{{.Pkg}}:{{.MethodName}}:"
 	return prefix + fmt.Sprintf({{.Arg.CacheKeySprintf}})
 }
 {{end}}

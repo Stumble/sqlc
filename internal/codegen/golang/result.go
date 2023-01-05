@@ -222,6 +222,7 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 		gq := Query{
 			Cmd:          query.Cmd,
 			ConstantName: constantName,
+			Pkg:          req.Settings.Go.Package,
 			FieldName:    sdk.LowerTitle(query.Name) + "Stmt",
 			MethodName:   query.Name,
 			SourceName:   query.Filename,
@@ -361,7 +362,7 @@ func buildQueryInvalidates(queries []Query) {
 					}
 				}
 			}
-			cacheKey := genCacheKeyWithArgName(*query, argName, true)
+			cacheKey := genCacheKeyWithArgName(query.Pkg, *query, argName, true)
 			if q.Arg.isEmpty() {
 				q.Invalidates = append(q.Invalidates, InvalidateParam{
 					Q:        query,
@@ -518,29 +519,29 @@ func verifyRawSQLs(sqls []string) error {
 }
 
 func max[T constraints.Ordered](s []T) T {
-    if len(s) == 0 {
-        var zero T
-        return zero
-    }
-    m := s[0]
-    for _, v := range s {
-        if m < v {
-            m = v
-        }
-    }
-    return m
+	if len(s) == 0 {
+		var zero T
+		return zero
+	}
+	m := s[0]
+	for _, v := range s {
+		if m < v {
+			m = v
+		}
+	}
+	return m
 }
 
 func min[T constraints.Ordered](s []T) T {
-    if len(s) == 0 {
-        var zero T
-        return zero
-    }
-    m := s[0]
-    for _, v := range s {
-        if m > v {
-            m = v
-        }
-    }
-    return m
+	if len(s) == 0 {
+		var zero T
+		return zero
+	}
+	m := s[0]
+	for _, v := range s {
+		if m > v {
+			m = v
+		}
+	}
+	return m
 }

@@ -54,7 +54,7 @@ func (q *Queries) Complicated(ctx context.Context, n int32) (*int32, error) {
 	}
 
 	var rv *int32
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("Complicated:%+v", n), &rv, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:Complicated:%+v", n), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ type CreateAuthorParams struct {
 
 // CacheKey - cache key
 func (arg CreateAuthorParams) CacheKey() string {
-	prefix := "CreateAuthor:"
+	prefix := "users:CreateAuthor:"
 	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.Name, arg.Metadata, arg.Thumbnail)
 }
 
@@ -118,13 +118,13 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams, getU
 	invalidateErr := q.db.PostExec(func() error {
 		var anyErr error
 		if getUserByID != nil {
-			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetUserByID:%+v", *getUserByID))
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("users:GetUserByID:%+v", *getUserByID))
 			if err != nil {
 				anyErr = err
 			}
 		}
 		if getUserByName != nil {
-			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetUserByName:%+v", *getUserByName))
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("users:GetUserByName:%+v", *getUserByName))
 			if err != nil {
 				anyErr = err
 			}
@@ -154,7 +154,7 @@ func (q *Queries) DeleteAuthor(ctx context.Context, id int32, getUserByID1 *int3
 	invalidateErr := q.db.PostExec(func() error {
 		var anyErr error
 		if getUserByID1 != nil {
-			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetUserByID:%+v", *getUserByID1))
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("users:GetUserByID:%+v", *getUserByID1))
 			if err != nil {
 				anyErr = err
 			}
@@ -205,7 +205,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 	}
 
 	var rv *User
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByID:%+v", id), &rv, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:GetUserByID:%+v", id), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +244,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 	}
 
 	var rv *User
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetUserByName:%+v", name), &rv, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:GetUserByName:%+v", name), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ type ListUserNamesParams struct {
 
 // CacheKey - cache key
 func (arg ListUserNamesParams) CacheKey() string {
-	prefix := "ListUserNames:"
+	prefix := "users:ListUserNames:"
 	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
 }
 
@@ -324,7 +324,7 @@ type ListUsersParams struct {
 
 // CacheKey - cache key
 func (arg ListUsersParams) CacheKey() string {
-	prefix := "ListUsers:"
+	prefix := "users:ListUsers:"
 	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
 }
 

@@ -1,11 +1,5 @@
 # A wicked fork
 
-## TODOs
-1. Batch support for wpgx.
-2. v := &int32{} bug
-3. cache key uniqueness: add table prefix.
-
-
 ## Opinionated choices
 1. a set of rules mapping pg types to go types.
 2. always emit JSON tag.
@@ -20,7 +14,10 @@
    `SELECT * FROM table ORDER BY some_primary_key` with name "Dump" and type as ":many". 
    And Load query must be like `INSERT INTO table (.*) VALUES ($1, $2...);` with name "Load"
    and type as ":exec".
-6. ``` backtick symbol is prohibited in schema.sql file.
+6. "\`" backtick symbol is prohibited in schema.sql file.
+7. cache key uniqueness: cache key for a query is consisted by
+   `packageName + methodName + "joining arguments in string format with ","`.
+   The uniqueness of package names are checked for one configuration file.
 
 ## Opinionated fixes (changes)
 1. Duplicated model for partitioned table:
@@ -33,6 +30,9 @@
 3. Not really doing type-checking on everything:
    Although using type cast can help to generate correctly typed code, but we found that not
    all SQL code are type-checked correctly. We might need to implement a new type check pass.
+
+## TODOs
+1. Batch support for wpgx.
 
 ## Cherry-picked fixes
 + TBD: https://github.com/kyleconroy/sqlc/pull/2001

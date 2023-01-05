@@ -44,7 +44,7 @@ type CreateItemsParams struct {
 
 // CacheKey - cache key
 func (arg CreateItemsParams) CacheKey() string {
-	prefix := "CreateItems:"
+	prefix := "items:CreateItems:"
 	return prefix + fmt.Sprintf("%+v,%+v,%+v,%+v,%+v,%+v",
 		arg.Name,
 		arg.Description,
@@ -115,7 +115,7 @@ func (q *Queries) DeleteItem(ctx context.Context, id int64, getItemByID *int64, 
 	invalidateErr := q.db.PostExec(func() error {
 		var anyErr error
 		if getItemByID != nil {
-			err = q.cache.Invalidate(ctx, fmt.Sprintf("GetItemByID:%+v", *getItemByID))
+			err = q.cache.Invalidate(ctx, fmt.Sprintf("items:GetItemByID:%+v", *getItemByID))
 			if err != nil {
 				anyErr = err
 			}
@@ -170,7 +170,7 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 	}
 
 	var rv *Item
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("GetItemByID:%+v", id), &rv, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("items:GetItemByID:%+v", id), &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ type ListItemsParams struct {
 
 // CacheKey - cache key
 func (arg ListItemsParams) CacheKey() string {
-	prefix := "ListItems:"
+	prefix := "items:ListItems:"
 	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
 }
 
@@ -283,7 +283,7 @@ func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error
 	}
 
 	var items []Item
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("ListSomeItems:%+v", ids), &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("items:ListSomeItems:%+v", ids), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +333,7 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 	}
 
 	var items []Item
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("SearchItems:%+v", name), &items, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("items:SearchItems:%+v", name), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
