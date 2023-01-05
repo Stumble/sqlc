@@ -31,7 +31,7 @@ type CreateAuthorParams struct {
 
 // CacheKey - cache key
 func (arg CreateAuthorParams) CacheKey() string {
-	prefix := "CreateAuthor:"
+	prefix := "orders:CreateAuthor:"
 	return prefix + fmt.Sprintf("%+v,%+v", arg.Userid, arg.Itemid)
 }
 
@@ -151,7 +151,7 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 	}
 
 	var rv *GetOrderByIDRow
-	err := q.cache.GetWithTtl(ctx, "GetOrderByID", &rv, dbRead, false, false)
+	err := q.cache.GetWithTtl(ctx, "orders:GetOrderByID", &rv, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ type ListOrdersByGenderParams struct {
 
 // CacheKey - cache key
 func (arg ListOrdersByGenderParams) CacheKey() string {
-	prefix := "ListOrdersByGender:"
+	prefix := "orders:ListOrdersByGender:"
 	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.After, arg.First, arg.Gender)
 }
 
@@ -240,7 +240,7 @@ type ListOrdersByUserParams struct {
 
 // CacheKey - cache key
 func (arg ListOrdersByUserParams) CacheKey() string {
-	prefix := "ListOrdersByUser:"
+	prefix := "orders:ListOrdersByUser:"
 	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.Userid, arg.After, arg.First)
 }
 
