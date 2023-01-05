@@ -1,7 +1,10 @@
 # A wicked fork
 
 ## TODOs
-1. Batch and CopyFrom support for wpgx.
+1. Batch support for wpgx.
+2. v := &int32{} bug
+3. cache key uniqueness: add table prefix.
+
 
 ## Opinionated choices
 1. a set of rules mapping pg types to go types.
