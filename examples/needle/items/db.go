@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS Items (
    Category     ItemCategory        NOT NULL,
    Price        DECIMAL(10,2)       NOT NULL,
    Thumbnail    TEXT                NOT NULL,
+   QRCode       CHAR(1024),
    Metadata     JSON,
    CreatedAt    TIMESTAMP           NOT NULL DEFAULT NOW(),
    UpdatedAt    TIMESTAMP           NOT NULL DEFAULT NOW(),

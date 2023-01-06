@@ -31,7 +31,7 @@ INSERT INTO Items (
 ) VALUES (
   $1, $2, $3, $4, $5, $6
 )
-RETURNING id, name, description, category, price, thumbnail, metadata, createdat, updatedat
+RETURNING id, name, description, category, price, thumbnail, qrcode, metadata, createdat, updatedat
 `
 
 type CreateItemsParams struct {
@@ -60,6 +60,7 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item
 		&i.Category,
 		&i.Price,
 		&i.Thumbnail,
+		&i.Qrcode,
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -111,7 +112,7 @@ func (q *Queries) DeleteItem(ctx context.Context, id int64, getItemByID *int64, 
 }
 
 const getItemByID = `-- name: GetItemByID :one
-SELECT id, name, description, category, price, thumbnail, metadata, createdat, updatedat FROM Items
+SELECT id, name, description, category, price, thumbnail, qrcode, metadata, createdat, updatedat FROM Items
 WHERE id = $1 LIMIT 1
 `
 
@@ -128,6 +129,7 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 			&i.Category,
 			&i.Price,
 			&i.Thumbnail,
+			&i.Qrcode,
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -152,7 +154,7 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 }
 
 const listItems = `-- name: ListItems :many
-SELECT id, name, description, category, price, thumbnail, metadata, createdat, updatedat FROM Items
+SELECT id, name, description, category, price, thumbnail, qrcode, metadata, createdat, updatedat FROM Items
 WHERE id > $1
 ORDER BY id
 LIMIT $2
@@ -179,6 +181,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, e
 			&i.Category,
 			&i.Price,
 			&i.Thumbnail,
+			&i.Qrcode,
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -195,7 +198,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, e
 }
 
 const listSomeItems = `-- name: ListSomeItems :many
-SELECT id, name, description, category, price, thumbnail, metadata, createdat, updatedat FROM Items
+SELECT id, name, description, category, price, thumbnail, qrcode, metadata, createdat, updatedat FROM Items
 WHERE id = ANY($1::bigserial[])
 `
 
@@ -215,6 +218,7 @@ func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error
 			&i.Category,
 			&i.Price,
 			&i.Thumbnail,
+			&i.Qrcode,
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -231,7 +235,7 @@ func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error
 }
 
 const searchItems = `-- name: SearchItems :many
-SELECT id, name, description, category, price, thumbnail, metadata, createdat, updatedat FROM Items
+SELECT id, name, description, category, price, thumbnail, qrcode, metadata, createdat, updatedat FROM Items
 WHERE Name LIKE $1
 `
 
@@ -254,6 +258,7 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 				&i.Category,
 				&i.Price,
 				&i.Thumbnail,
+				&i.Qrcode,
 				&i.Metadata,
 				&i.CreatedAt,
 				&i.UpdatedAt,
@@ -280,10 +285,46 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) 
 	return items, err
 }
 
+const updateQRCode = `-- name: UpdateQRCode :execrows
+UPDATE Items
+SET
+  QRCode = $1
+WHERE
+  id = $2
+`
+
+type UpdateQRCodeParams struct {
+	Qrcode *string
+	ID     int64
+}
+
+// -- invalidate : [GetItemByID]
+func (q *Queries) UpdateQRCode(ctx context.Context, arg UpdateQRCodeParams, getItemByID1 *int64) (int64, error) {
+	result, err := q.db.WExec(ctx, "UpdateQRCode", updateQRCode, arg.Qrcode, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	// invalidate
+	_ = q.db.PostExec(func() error {
+		var anyErr error
+		if getItemByID1 != nil {
+			key := fmt.Sprintf("items:GetItemByID:%+v", *getItemByID1)
+			err = q.cache.Invalidate(ctx, key)
+			if err != nil {
+				log.Err(err).Msgf(
+					"Failed to invalidate: %s", key)
+				anyErr = err
+			}
+		}
+		return anyErr
+	})
+	return result.RowsAffected(), nil
+}
+
 //// auto generated functions
 
 func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
-	sql := "SELECT id,name,description,category,price,thumbnail,metadata,createdat,updatedat FROM items ORDER BY id,name,description,category,price,thumbnail,metadata,createdat,updatedat ASC;"
+	sql := "SELECT id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat FROM items ORDER BY id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat ASC;"
 	rows, err := q.db.WQuery(ctx, "Dump", sql)
 	if err != nil {
 		return nil, err
@@ -292,7 +333,7 @@ func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, e
 	var items []Item
 	for rows.Next() {
 		var v Item
-		if err := rows.Scan(&v.ID, &v.Name, &v.Description, &v.Category, &v.Price, &v.Thumbnail, &v.Metadata, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.Name, &v.Description, &v.Category, &v.Price, &v.Thumbnail, &v.Qrcode, &v.Metadata, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, err
 		}
 		for _, applyBeforeDump := range beforeDump {
@@ -311,14 +352,14 @@ func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, e
 }
 
 func (q *Queries) Load(ctx context.Context, data []byte) error {
-	sql := "INSERT INTO items (id,name,description,category,price,thumbnail,metadata,createdat,updatedat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9);"
+	sql := "INSERT INTO items (id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);"
 	rows := make([]Item, 0)
 	err := json.Unmarshal(data, &rows)
 	if err != nil {
 		return err
 	}
 	for _, row := range rows {
-		_, err := q.db.WExec(ctx, "Load", sql, row.ID, row.Name, row.Description, row.Category, row.Price, row.Thumbnail, row.Metadata, row.CreatedAt, row.UpdatedAt)
+		_, err := q.db.WExec(ctx, "Load", sql, row.ID, row.Name, row.Description, row.Category, row.Price, row.Thumbnail, row.Qrcode, row.Metadata, row.CreatedAt, row.UpdatedAt)
 		if err != nil {
 			return err
 		}
