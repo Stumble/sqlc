@@ -31,6 +31,14 @@ RETURNING *;
 DELETE FROM Items
 WHERE id = $1;
 
+-- name: UpdateQRCode :execrows
+-- -- invalidate : [GetItemByID]
+UPDATE Items
+SET
+  QRCode = $1
+WHERE
+  id = $2;
+
 -- name: BulkInsert :copyfrom
 INSERT INTO items (
   Name, Description, Category, Price, Thumbnail, Metadata

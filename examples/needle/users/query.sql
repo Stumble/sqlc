@@ -22,6 +22,13 @@ WHERE
   ID = $2
 RETURNING ID;
 
+-- name: UpdateMetaByID :execrows
+UPDATE users
+SET
+  Metadata = $1
+WHERE
+  ID = $2;
+
 -- name: ListUserNames :many
 SELECT id, name FROM users
 WHERE id > @after
