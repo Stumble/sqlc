@@ -39,8 +39,7 @@ func (q *Queries) Complicated(ctx context.Context, n int32) (*int32, error) {
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 60000)
-		row := q.db.WQueryRow(ctx, "Complicated", complicated,
-			n)
+		row := q.db.WQueryRow(ctx, "Complicated", complicated, n)
 		var x int32
 		err := row.Scan(&x)
 		if err == pgx.ErrNoRows {
@@ -88,8 +87,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams, getU
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 0)
-		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor,
-			arg.Name, arg.Metadata, arg.Thumbnail)
+		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Name, arg.Metadata, arg.Thumbnail)
 		var i User
 		err := row.Scan(
 			&i.ID,
@@ -184,8 +182,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 30000)
-		row := q.db.WQueryRow(ctx, "GetUserByID", getUserByID,
-			id)
+		row := q.db.WQueryRow(ctx, "GetUserByID", getUserByID, id)
 		var i User
 		err := row.Scan(
 			&i.ID,
@@ -223,8 +220,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
-		row := q.db.WQueryRow(ctx, "GetUserByName", getUserByName,
-			name)
+		row := q.db.WQueryRow(ctx, "GetUserByName", getUserByName, name)
 		var i User
 		err := row.Scan(
 			&i.ID,

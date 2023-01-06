@@ -39,8 +39,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
-        row := q.db.WQueryRow(ctx, "{{.MethodName}}", {{.ConstantName}},
-            {{.Arg.Params}})
+        row := q.db.WQueryRow(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
 	    var {{.Ret.Name}} {{.Ret.Type}}
 	    err := row.Scan({{.Ret.Scan}})
         if err == pgx.ErrNoRows {
