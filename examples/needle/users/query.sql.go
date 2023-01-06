@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/rs/zerolog/log"
 )
 
 const complicated = `-- name: Complicated :one
@@ -36,32 +38,31 @@ FROM fibonacci
 // -- cache : 1m
 // example of sqlc cannot handle recursive query.
 func (q *Queries) Complicated(ctx context.Context, n int32) (*int32, error) {
-	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 60000)
 		row := q.db.WQueryRow(ctx, "Complicated", complicated, n)
-		var x int32
-		err := row.Scan(&x)
+		var x *int32 = new(int32)
+		err := row.Scan(x)
 		if err == pgx.ErrNoRows {
 			return (*int32)(nil), cacheDuration, nil
 		}
-		return &x, cacheDuration, err
+		return x, cacheDuration, err
 	}
 	if q.cache == nil {
-		rv, _, err := dbRead()
-		return rv.(*int32), err
+		x, _, err := dbRead()
+		return x.(*int32), err
 	}
 
-	var rv *int32
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:Complicated:%+v", n), &rv, dbRead, false, false)
+	var x *int32
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:Complicated:%+v", n), x, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return rv, err
+	return x, err
 }
 
-const createAuthor = `-- name: CreateAuthor :one
+const createUser = `-- name: CreateUser :one
 INSERT INTO Users (
   Name, Metadata, Thumbnail
 ) VALUES (
@@ -70,105 +71,117 @@ INSERT INTO Users (
 RETURNING id, name, metadata, thumbnail, createdat
 `
 
-type CreateAuthorParams struct {
+type CreateUserParams struct {
 	Name      string
 	Metadata  []byte
 	Thumbnail string
 }
 
-// CacheKey - cache key
-func (arg CreateAuthorParams) CacheKey() string {
-	prefix := "users:CreateAuthor:"
-	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.Name, arg.Metadata, arg.Thumbnail)
-}
-
 // -- invalidate : [GetUserByID, GetUserByName]
-func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams, getUserByID *int32, getUserByName *string) (*User, error) {
-	// TODO(mustRevalidate, noStore)
-	dbRead := func() (any, time.Duration, error) {
-		cacheDuration := time.Duration(time.Millisecond * 0)
-		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Name, arg.Metadata, arg.Thumbnail)
-		var i User
-		err := row.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Metadata,
-			&i.Thumbnail,
-			&i.CreatedAt,
-		)
-		if err == pgx.ErrNoRows {
-			return (*User)(nil), cacheDuration, nil
-		}
-		return &i, cacheDuration, err
-	}
-	if q.cache == nil {
-		rv, _, err := dbRead()
-		return rv.(*User), err
-	}
-
-	var rv *User
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &rv, dbRead, false, false)
-	if err != nil {
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams, getUserByID *int32, getUserByName *string) (*User, error) {
+	row := q.db.WQueryRow(ctx, "CreateUser", createUser, arg.Name, arg.Metadata, arg.Thumbnail)
+	var i *User = new(User)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Metadata,
+		&i.Thumbnail,
+		&i.CreatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return (*User)(nil), nil
+	} else if err != nil {
 		return nil, err
 	}
 
 	// invalidate
-	invalidateErr := q.db.PostExec(func() error {
+	_ = q.db.PostExec(func() error {
 		var anyErr error
 		if getUserByID != nil {
-			err = q.cache.Invalidate(ctx, fmt.Sprintf("users:GetUserByID:%+v", *getUserByID))
+			key := fmt.Sprintf("users:GetUserByID:%+v", *getUserByID)
+			err = q.cache.Invalidate(ctx, key)
 			if err != nil {
+				log.Err(err).Msgf(
+					"Failed to invalidate: %s", key)
 				anyErr = err
 			}
 		}
 		if getUserByName != nil {
-			err = q.cache.Invalidate(ctx, fmt.Sprintf("users:GetUserByName:%+v", *getUserByName))
+			key := fmt.Sprintf("users:GetUserByName:%+v", *getUserByName)
+			err = q.cache.Invalidate(ctx, key)
 			if err != nil {
+				log.Err(err).Msgf(
+					"Failed to invalidate: %s", key)
 				anyErr = err
 			}
 		}
 		return anyErr
 	})
-	if invalidateErr != nil {
-		// invalidateErr is ignored for now.
-	}
-
-	return rv, err
+	return i, err
 }
 
-const deleteAuthor = `-- name: DeleteAuthor :exec
+const deleteBadUsers = `-- name: DeleteBadUsers :execresult
+DELETE FROM Users
+WHERE NAME LIKE $1
+`
+
+// -- invalidate : [GetUserByID]
+func (q *Queries) DeleteBadUsers(ctx context.Context, name string, getUserByID1 *int32) (pgconn.CommandTag, error) {
+	rv, err := q.db.WExec(ctx, "DeleteBadUsers", deleteBadUsers, name)
+	if err != nil {
+		return rv, err
+	}
+	// invalidate
+	_ = q.db.PostExec(func() error {
+		var anyErr error
+		if getUserByID1 != nil {
+			key := fmt.Sprintf("users:GetUserByID:%+v", *getUserByID1)
+			err = q.cache.Invalidate(ctx, key)
+			if err != nil {
+				log.Err(err).Msgf(
+					"Failed to invalidate: %s", key)
+				anyErr = err
+			}
+		}
+		return anyErr
+	})
+	return rv, nil
+}
+
+const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM Users
 WHERE id = $1
 `
 
-// -- invalidate : [GetUserByID, ListUsers]
-func (q *Queries) DeleteAuthor(ctx context.Context, id int32, getUserByID1 *int32, listUsers *ListUsersParams) error {
-	_, err := q.db.WExec(ctx, "DeleteAuthor", deleteAuthor, id)
+// -- invalidate : [GetUserByID, GetUserByName]
+func (q *Queries) DeleteUser(ctx context.Context, id int32, getUserByID2 *int32, getUserByName1 *string) error {
+	_, err := q.db.WExec(ctx, "DeleteUser", deleteUser, id)
 	if err != nil {
 		return err
 	}
-
 	// invalidate
-	invalidateErr := q.db.PostExec(func() error {
+	_ = q.db.PostExec(func() error {
 		var anyErr error
-		if getUserByID1 != nil {
-			err = q.cache.Invalidate(ctx, fmt.Sprintf("users:GetUserByID:%+v", *getUserByID1))
+		if getUserByID2 != nil {
+			key := fmt.Sprintf("users:GetUserByID:%+v", *getUserByID2)
+			err = q.cache.Invalidate(ctx, key)
 			if err != nil {
+				log.Err(err).Msgf(
+					"Failed to invalidate: %s", key)
 				anyErr = err
 			}
 		}
-		if listUsers != nil {
-			err = q.cache.Invalidate(ctx, listUsers.CacheKey())
+		if getUserByName1 != nil {
+			key := fmt.Sprintf("users:GetUserByName:%+v", *getUserByName1)
+			err = q.cache.Invalidate(ctx, key)
 			if err != nil {
+				log.Err(err).Msgf(
+					"Failed to invalidate: %s", key)
 				anyErr = err
 			}
 		}
 		return anyErr
 	})
-	if invalidateErr != nil {
-		// invalidateErr is ignored for now.
-	}
-
 	return nil
 }
 
@@ -179,11 +192,10 @@ WHERE id = $1 LIMIT 1
 
 // -- cache : 30s
 func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
-	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 30000)
 		row := q.db.WQueryRow(ctx, "GetUserByID", getUserByID, id)
-		var i User
+		var i *User = new(User)
 		err := row.Scan(
 			&i.ID,
 			&i.Name,
@@ -194,20 +206,20 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 		if err == pgx.ErrNoRows {
 			return (*User)(nil), cacheDuration, nil
 		}
-		return &i, cacheDuration, err
+		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		rv, _, err := dbRead()
-		return rv.(*User), err
+		i, _, err := dbRead()
+		return i.(*User), err
 	}
 
-	var rv *User
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:GetUserByID:%+v", id), &rv, dbRead, false, false)
+	var i *User
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:GetUserByID:%+v", id), i, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return rv, err
+	return i, err
 }
 
 const getUserByName = `-- name: GetUserByName :one
@@ -217,11 +229,10 @@ WHERE Name = $1 LIMIT 1
 
 // -- cache : 5m
 func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error) {
-	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
 		row := q.db.WQueryRow(ctx, "GetUserByName", getUserByName, name)
-		var i User
+		var i *User = new(User)
 		err := row.Scan(
 			&i.ID,
 			&i.Name,
@@ -232,20 +243,20 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 		if err == pgx.ErrNoRows {
 			return (*User)(nil), cacheDuration, nil
 		}
-		return &i, cacheDuration, err
+		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		rv, _, err := dbRead()
-		return rv.(*User), err
+		i, _, err := dbRead()
+		return i.(*User), err
 	}
 
-	var rv *User
-	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:GetUserByName:%+v", name), &rv, dbRead, false, false)
+	var i *User
+	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("users:GetUserByName:%+v", name), i, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return rv, err
+	return i, err
 }
 
 const listUserNames = `-- name: ListUserNames :many
@@ -260,46 +271,26 @@ type ListUserNamesParams struct {
 	First int32
 }
 
-// CacheKey - cache key
-func (arg ListUserNamesParams) CacheKey() string {
-	prefix := "users:ListUserNames:"
-	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
-}
-
 type ListUserNamesRow struct {
 	ID   int32
 	Name string
 }
 
 func (q *Queries) ListUserNames(ctx context.Context, arg ListUserNamesParams) ([]ListUserNamesRow, error) {
-	dbRead := func() (any, time.Duration, error) {
-		cacheDuration := time.Duration(time.Millisecond * 0)
-		rows, err := q.db.WQuery(ctx, "ListUserNames", listUserNames, arg.After, arg.First)
-		if err != nil {
-			return nil, 0, err
-		}
-		defer rows.Close()
-		var items []ListUserNamesRow
-		for rows.Next() {
-			var i ListUserNamesRow
-			if err := rows.Scan(&i.ID, &i.Name); err != nil {
-				return nil, 0, err
-			}
-			items = append(items, i)
-		}
-		if err := rows.Err(); err != nil {
-			return nil, 0, err
-		}
-		return items, cacheDuration, nil
-	}
-	if q.cache == nil {
-		items, _, err := dbRead()
-		return items.([]ListUserNamesRow), err
-	}
-
-	var items []ListUserNamesRow
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
+	rows, err := q.db.WQuery(ctx, "ListUserNames", listUserNames, arg.After, arg.First)
 	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserNamesRow
+	for rows.Next() {
+		var i *ListUserNamesRow = new(ListUserNamesRow)
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, *i)
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -318,51 +309,93 @@ type ListUsersParams struct {
 	First int32
 }
 
-// CacheKey - cache key
-func (arg ListUsersParams) CacheKey() string {
-	prefix := "users:ListUsers:"
-	return prefix + fmt.Sprintf("%+v,%+v", arg.After, arg.First)
-}
-
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	dbRead := func() (any, time.Duration, error) {
-		cacheDuration := time.Duration(time.Millisecond * 0)
-		rows, err := q.db.WQuery(ctx, "ListUsers", listUsers, arg.After, arg.First)
-		if err != nil {
-			return nil, 0, err
-		}
-		defer rows.Close()
-		var items []User
-		for rows.Next() {
-			var i User
-			if err := rows.Scan(
-				&i.ID,
-				&i.Name,
-				&i.Metadata,
-				&i.Thumbnail,
-				&i.CreatedAt,
-			); err != nil {
-				return nil, 0, err
-			}
-			items = append(items, i)
-		}
-		if err := rows.Err(); err != nil {
-			return nil, 0, err
-		}
-		return items, cacheDuration, nil
-	}
-	if q.cache == nil {
-		items, _, err := dbRead()
-		return items.([]User), err
-	}
-
-	var items []User
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
+	rows, err := q.db.WQuery(ctx, "ListUsers", listUsers, arg.After, arg.First)
 	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i *User = new(User)
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Metadata,
+			&i.Thumbnail,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, *i)
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
 	return items, err
+}
+
+const updateNameByID = `-- name: UpdateNameByID :one
+UPDATE users
+SET
+  Name = $1
+WHERE
+  ID = $2
+RETURNING ID
+`
+
+type UpdateNameByIDParams struct {
+	Name string
+	ID   int32
+}
+
+func (q *Queries) UpdateNameByID(ctx context.Context, arg UpdateNameByIDParams) (*int32, error) {
+	row := q.db.WQueryRow(ctx, "UpdateNameByID", updateNameByID, arg.Name, arg.ID)
+	var id *int32 = new(int32)
+	err := row.Scan(id)
+	if err == pgx.ErrNoRows {
+		return (*int32)(nil), nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	return id, err
+}
+
+const updateUserGrade = `-- name: UpdateUserGrade :execrows
+UPDATE users
+  SET metadata = jsonb_set(metadata, '{grade}', $1::text, true)
+WHERE
+  Name LIKE $2
+`
+
+type UpdateUserGradeParams struct {
+	Grade string
+	Name  string
+}
+
+// -- invalidate : [GetUserByID]
+func (q *Queries) UpdateUserGrade(ctx context.Context, arg UpdateUserGradeParams, getUserByID3 *int32) (int64, error) {
+	result, err := q.db.WExec(ctx, "UpdateUserGrade", updateUserGrade, arg.Grade, arg.Name)
+	if err != nil {
+		return 0, err
+	}
+	// invalidate
+	_ = q.db.PostExec(func() error {
+		var anyErr error
+		if getUserByID3 != nil {
+			key := fmt.Sprintf("users:GetUserByID:%+v", *getUserByID3)
+			err = q.cache.Invalidate(ctx, key)
+			if err != nil {
+				log.Err(err).Msgf(
+					"Failed to invalidate: %s", key)
+				anyErr = err
+			}
+		}
+		return anyErr
+	})
+	return result.RowsAffected(), nil
 }
 
 //// auto generated functions
@@ -410,3 +443,9 @@ func (q *Queries) Load(ctx context.Context, data []byte) error {
 	}
 	return nil
 }
+
+// eliminate unused error
+var _ = log.Logger
+var _ = fmt.Sprintf("")
+var _ = time.Now()
+var _ = json.RawMessage{}

@@ -110,12 +110,14 @@ func Generate(ctx context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenR
 	if err != nil {
 		return nil, err
 	}
-
 	if req.Settings.Go.OmitUnusedStructs {
 		enums, structs = filterUnusedStructs(enums, structs, queries)
 	}
-
-	buildQueryInvalidates(queries)
+	err = buildQueryInvalidates(queries)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: remove this
 	err = verifyRawSQLs(req.Catalog.RawSqls)
 	if err != nil {
 		return nil, err

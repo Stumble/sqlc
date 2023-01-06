@@ -18,9 +18,11 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/pganalyze/pg_query_go/v4 v4.2.1
 	github.com/riza-io/grpc-go v0.2.0
+	github.com/rs/zerolog v1.28.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stumble/wpgx v0.0.0-20221231080142-37c8ab0f87d7
+	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 	golang.org/x/sync v0.3.0
 	google.golang.org/grpc v1.56.1
 	google.golang.org/protobuf v1.31.0
@@ -42,9 +44,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
-	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
-	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/sys v0.8.0 // indirect
 )
 

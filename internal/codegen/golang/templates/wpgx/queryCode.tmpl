@@ -14,11 +14,11 @@ type {{.Arg.Type}} struct { {{- range .Arg.Struct.Fields}}
   {{- end}}
 }
 
-{{if (ne .Cmd ":copyfrom")}}
+{{if and (ne .Cmd ":copyfrom") (ne .Option.Cache.Milliseconds 0)}}
 // CacheKey - cache key
 func ({{.Arg.Name}} {{.Arg.Type}}) CacheKey() string {
     prefix := "{{.Pkg}}:{{.MethodName}}:"
-	return prefix + fmt.Sprintf({{.Arg.CacheKeySprintf}})
+    return prefix + fmt.Sprintf({{.Arg.CacheKeySprintf}})
 }
 {{end}}
 
@@ -36,106 +36,132 @@ type {{.Ret.Type}} struct { {{- range .Ret.Struct.Fields}}
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
-	// TODO(mustRevalidate, noStore)
-	dbRead := func() (any, time.Duration, error) {
+{{- if eq .Option.Cache.Milliseconds 0}}
+    row := q.db.WQueryRow(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
+    err := row.Scan({{.Ret.Scan}})
+    if err == pgx.ErrNoRows {
+        return (*{{.Ret.Type}})(nil), nil
+    } else if err != nil {
+        return nil, err
+    }
+{{else}}
+    dbRead := func() (any, time.Duration, error) {
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
         row := q.db.WQueryRow(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
-	    var {{.Ret.Name}} {{.Ret.Type}}
-	    err := row.Scan({{.Ret.Scan}})
+        var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
+        err := row.Scan({{.Ret.Scan}})
         if err == pgx.ErrNoRows {
             return (*{{.Ret.Type}})(nil), cacheDuration, nil
         }
-	    return &{{.Ret.Name}}, cacheDuration, err
+        return {{.Ret.Name}}, cacheDuration, err
     }
-	if q.cache == nil {
-		rv, _, err := dbRead()
-		return rv.(*{{.Ret.Type}}), err
-	}
+    if q.cache == nil {
+        {{.Ret.Name}}, _, err := dbRead()
+        return {{.Ret.Name}}.(*{{.Ret.Type}}), err
+    }
 
-	var rv *{{.Ret.Type}}
-	err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, &rv, dbRead, false, false)
-	if err != nil {
-		return nil, err
-	}
+    var {{.Ret.Name}} *{{.Ret.Type}}
+    err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, {{.Ret.Name}}, dbRead, false, false)
+    if err != nil {
+        return nil, err
+    }
+{{- end}}
 
-    {{ if  .Option.Invalidates -}}
+{{ if  .Option.Invalidates -}}
     // invalidate
-	invalidateErr := q.db.PostExec(func() error {
+    _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
         if {{.ArgName}} != nil {
-		    err = q.cache.Invalidate(ctx, {{.CacheKey}})
+            key := {{.CacheKey}}
+            err = q.cache.Invalidate(ctx, key)
             if err != nil {
+                log.Err(err).Msgf(
+                    "Failed to invalidate: %s", key)
                 anyErr = err
             }
         }
         {{ end -}}
         return anyErr
-	})
-    if invalidateErr != nil {
-        // invalidateErr is ignored for now.
-    }
-    {{- end }}
-
-	return rv, err
+    })
+{{- end }}
+    return {{.Ret.Name}}, err
 }
 {{end}}
 
 {{if eq .Cmd ":many"}}
 {{range .Comments}}//{{.}}
 {{end -}}
-func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.DefineType}}, error) {
-	dbRead := func() (any, time.Duration, error) {
+func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.Type}}, error) {
+{{- if eq .Option.Cache.Milliseconds 0}}
+    rows, err := q.db.WQuery(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    var items []{{.Ret.Type}}
+    for rows.Next() {
+        var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
+        if err := rows.Scan({{.Ret.Scan}}); err != nil {
+            return nil, err
+        }
+        items = append(items, *{{.Ret.Name}})
+    }
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
+{{else}}
+    dbRead := func() (any, time.Duration, error) {
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
         rows, err := q.db.WQuery(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
-		if err != nil {
-			return nil, 0, err
-		}
-		defer rows.Close()
-	    var items []{{.Ret.DefineType}}
-		for rows.Next() {
-		    var {{.Ret.Name}} {{.Ret.Type}}
-		    if err := rows.Scan({{.Ret.Scan}}); err != nil {
-			    return nil, 0, err
-		    }
-		    items = append(items, {{.Ret.ReturnName}})
-		}
-		if err := rows.Err(); err != nil {
-			return nil, 0, err
-		}
-		return items, cacheDuration, nil
-	}
-	if q.cache == nil {
-		items, _, err := dbRead()
-		return items.([]{{.Ret.DefineType}}), err
-	}
+        if err != nil {
+            return nil, 0, err
+        }
+        defer rows.Close()
+        var items []{{.Ret.Type}}
+        for rows.Next() {
+            var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
+            if err := rows.Scan({{.Ret.Scan}}); err != nil {
+                return nil, 0, err
+            }
+            items = append(items, *{{.Ret.Name}})
+        }
+        if err := rows.Err(); err != nil {
+            return nil, 0, err
+        }
+        return items, cacheDuration, nil
+    }
+    if q.cache == nil {
+        items, _, err := dbRead()
+        return items.([]{{.Ret.Type}}), err
+    }
+    var items []{{.Ret.Type}}
+    err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, &items, dbRead, false, false)
+    if err != nil {
+        return nil, err
+    }
+{{- end}}
 
-	var items []{{.Ret.DefineType}}
-	err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, &items, dbRead, false, false)
-	if err != nil {
-		return nil, err
-	}
-
-    {{ if  .Option.Invalidates -}}
+{{ if  .Option.Invalidates -}}
     // invalidate
-	invalidateErr := q.db.PostExec(func() error {
+    _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
         if {{.ArgName}} != nil {
-		    err = q.cache.Invalidate(ctx, {{.CacheKey}})
+            key := {{.CacheKey}}
+            err = q.cache.Invalidate(ctx, key)
             if err != nil {
+                log.Err(err).Msgf(
+                    "Failed to invalidate: %s", key)
                 anyErr = err
             }
         }
         {{ end -}}
         return anyErr
-	})
-    if invalidateErr != nil {
-        // invalidateErr is ignored for now.
-    }
-    {{- end }}
-
-	return items, err
+    })
+{{- end }}
+    return items, err
 }
 {{end}}
 
@@ -143,30 +169,28 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) error {
-	_, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    _, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return err
     }
-
-    {{ if  .Option.Invalidates -}}
+{{ if  .Option.Invalidates -}}
     // invalidate
-	invalidateErr := q.db.PostExec(func() error {
+    _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
         if {{.ArgName}} != nil {
-		    err = q.cache.Invalidate(ctx, {{.CacheKey}})
+            key := {{.CacheKey}}
+            err = q.cache.Invalidate(ctx, key)
             if err != nil {
+                log.Err(err).Msgf(
+                    "Failed to invalidate: %s", key)
                 anyErr = err
             }
         }
         {{ end -}}
         return anyErr
-	})
-    if invalidateErr != nil {
-        // invalidateErr is ignored for now.
-    }
-    {{- end }}
-
+    })
+{{- end }}
     return nil
 }
 {{end}}
@@ -175,31 +199,29 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (int64, error) {
-	result, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
-	if err != nil {
-		return 0, err
-	}
-
-    {{ if  .Option.Invalidates -}}
+    result, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    if err != nil {
+        return 0, err
+    }
+{{ if  .Option.Invalidates -}}
     // invalidate
-	invalidateErr := q.db.PostExec(func() error {
+    _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
         if {{.ArgName}} != nil {
-		    err = q.cache.Invalidate(ctx, {{.CacheKey}})
+            key := {{.CacheKey}}
+            err = q.cache.Invalidate(ctx, key)
             if err != nil {
+                log.Err(err).Msgf(
+                    "Failed to invalidate: %s", key)
                 anyErr = err
             }
         }
         {{ end -}}
         return anyErr
-	})
-    if invalidateErr != nil {
-        // invalidateErr is ignored for now.
-    }
-    {{- end }}
-
-	return result.RowsAffected(), nil
+    })
+{{- end }}
+    return result.RowsAffected(), nil
 }
 {{end}}
 
@@ -207,30 +229,28 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (pgconn.CommandTag, error) {
-	rv, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
-	if err != nil {
-		return rv, err
-	}
-
-    {{ if  .Option.Invalidates -}}
+    rv, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    if err != nil {
+        return rv, err
+    }
+{{ if  .Option.Invalidates -}}
     // invalidate
-	invalidateErr := q.db.PostExec(func() error {
+    _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
         if {{.ArgName}} != nil {
-		    err = q.cache.Invalidate(ctx, {{.CacheKey}})
+            key := {{.CacheKey}}
+            err = q.cache.Invalidate(ctx, key)
             if err != nil {
+                log.Err(err).Msgf(
+                    "Failed to invalidate: %s", key)
                 anyErr = err
             }
         }
         {{ end -}}
         return anyErr
-	})
-    if invalidateErr != nil {
-        // invalidateErr is ignored for now.
-    }
-    {{- end }}
-
+    })
+{{- end }}
     return rv, nil
 }
 {{end}}
@@ -242,47 +262,47 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 //// auto generated functions
 
 func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
-	sql := "{{.DumpLoader.DumpSQL}}"
-	rows, err := q.db.WQuery(ctx, "Dump", sql)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []{{.DumpLoader.MainStructName}}
-	for rows.Next() {
-		var v {{.DumpLoader.MainStructName}}
-		if err := rows.Scan({{.DumpLoader.Fields "&v."}}); err != nil {
-			return nil, err
-		}
-		for _, applyBeforeDump := range beforeDump {
-			applyBeforeDump(&v)
-		}
-		items = append(items, v)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	bytes, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return bytes, nil
+    sql := "{{.DumpLoader.DumpSQL}}"
+    rows, err := q.db.WQuery(ctx, "Dump", sql)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    var items []{{.DumpLoader.MainStructName}}
+    for rows.Next() {
+        var v {{.DumpLoader.MainStructName}}
+        if err := rows.Scan({{.DumpLoader.Fields "&v."}}); err != nil {
+            return nil, err
+        }
+        for _, applyBeforeDump := range beforeDump {
+            applyBeforeDump(&v)
+        }
+        items = append(items, v)
+    }
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
+    bytes, err := json.MarshalIndent(items, "", "  ")
+    if err != nil {
+        return nil, err
+    }
+    return bytes, nil
 }
 
 func (q *Queries) Load(ctx context.Context, data []byte) error {
     sql := "{{.DumpLoader.LoadSQL}}"
-	rows := make([]{{.DumpLoader.MainStructName}}, 0)
-	err := json.Unmarshal(data, &rows)
-	if err != nil {
-		return err
-	}
-	for _, row := range rows {
-		_, err := q.db.WExec(ctx, "Load", sql, {{.DumpLoader.Fields "row."}})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+    rows := make([]{{.DumpLoader.MainStructName}}, 0)
+    err := json.Unmarshal(data, &rows)
+    if err != nil {
+        return err
+    }
+    for _, row := range rows {
+        _, err := q.db.WExec(ctx, "Load", sql, {{.DumpLoader.Fields "row."}})
+        if err != nil {
+            return err
+        }
+    }
+    return nil
 }
 
 {{end}}
