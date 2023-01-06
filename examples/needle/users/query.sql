@@ -14,13 +14,21 @@ WHERE id > @after
 ORDER BY id
 LIMIT @first;
 
+-- name: UpdateNameByID :one
+UPDATE users
+SET
+  Name = $1
+WHERE
+  ID = $2
+RETURNING ID;
+
 -- name: ListUserNames :many
 SELECT id, name FROM users
 WHERE id > @after
 ORDER BY id
 LIMIT @first;
 
--- name: CreateAuthor :one
+-- name: CreateUser :one
 -- -- invalidate : [GetUserByID, GetUserByName]
 INSERT INTO Users (
   Name, Metadata, Thumbnail
@@ -29,10 +37,22 @@ INSERT INTO Users (
 )
 RETURNING *;
 
--- name: DeleteAuthor :exec
--- -- invalidate : [GetUserByID, ListUsers]
+-- name: DeleteUser :exec
+-- -- invalidate : [GetUserByID, GetUserByName]
 DELETE FROM Users
 WHERE id = $1;
+
+-- name: UpdateUserGrade :execrows
+-- -- invalidate : [GetUserByID]
+UPDATE users
+  SET metadata = jsonb_set(metadata, '{grade}', @grade::text, true)
+WHERE
+  Name LIKE @name;
+
+-- name: DeleteBadUsers :execresult
+-- -- invalidate : [GetUserByID]
+DELETE FROM Users
+WHERE NAME LIKE $1;
 
 -- name: Complicated :one
 -- -- cache : 1m

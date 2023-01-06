@@ -289,7 +289,7 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 	return qs, nil
 }
 
-func buildQueryInvalidates(queries []Query) {
+func buildQueryInvalidates(queries []Query) error {
 	qmap := make(map[string]*Query)
 	for i := range queries {
 		qmap[queries[i].MethodName] = &queries[i]
@@ -300,6 +300,10 @@ func buildQueryInvalidates(queries []Query) {
 		q := &queries[i]
 		for _, toInvalidateName := range q.Option.Invalidates {
 			query := qmap[toInvalidateName]
+			if query.Option.Cache <= 0 {
+				return fmt.Errorf("%s tries to invalidate %s, which is not cached",
+					q.MethodName, toInvalidateName)
+			}
 			argName := sdk.LowerTitle(query.MethodName)
 			if argNames[argName] {
 				i := 0
@@ -329,6 +333,7 @@ func buildQueryInvalidates(queries []Query) {
 			}
 		}
 	}
+	return nil
 }
 
 func buildDumpLoader(structs []Struct) (*DumpLoader, error) {
