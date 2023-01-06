@@ -39,8 +39,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 0)
-		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor,
-			arg.Userid, arg.Itemid)
+		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Userid, arg.Itemid)
 		var i Order
 		err := row.Scan(
 			&i.ID,
