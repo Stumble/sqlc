@@ -60,7 +60,6 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 0)
 		row := q.db.WQueryRow(ctx, "CreateItems", createItems,
-
 			arg.Name,
 			arg.Description,
 			arg.Category,
@@ -145,8 +144,7 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
-		row := q.db.WQueryRow(ctx, "GetItemByID", getItemByID,
-			id)
+		row := q.db.WQueryRow(ctx, "GetItemByID", getItemByID, id)
 		var i Item
 		err := row.Scan(
 			&i.ID,
