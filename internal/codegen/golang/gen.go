@@ -56,11 +56,6 @@ func Generate(ctx context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenR
 	if err != nil {
 		return nil, err
 	}
-	// TODO: remove this
-	err = verifyRawSQLs(req.Catalog.RawSqls)
-	if err != nil {
-		return nil, err
-	}
 	return generate(req, enums, structs, queries)
 }
 

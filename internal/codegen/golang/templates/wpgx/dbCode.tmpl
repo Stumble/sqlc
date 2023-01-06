@@ -53,7 +53,7 @@ func (q *Queries) WithCache(cache Cache) *Queries {
 	}
 }
 
-var Schema = `
-{{.RawSchemaSQL}}
-`
+var Schema = {{$.Q}}
+{{escape .RawSchemaSQL}}
+{{$.Q}}
 {{end}}
