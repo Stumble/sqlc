@@ -14,8 +14,7 @@
    `SELECT * FROM table ORDER BY some_primary_key` with name "Dump" and type as ":many". 
    And Load query must be like `INSERT INTO table (.*) VALUES ($1, $2...);` with name "Load"
    and type as ":exec".
-6. "\`" backtick symbol is prohibited in schema.sql file.
-7. cache key uniqueness: cache key for a query is consisted by
+6. cache key uniqueness: cache key for a query is consisted by
    `packageName + methodName + "joining arguments in string format with ","`.
    The uniqueness of package names are checked for one configuration file.
 
