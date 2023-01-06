@@ -46,7 +46,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         if err == pgx.ErrNoRows {
             return (*{{.Ret.Type}})(nil), cacheDuration, nil
         }
-	    return {{.Ret.Name}}, cacheDuration, err
+	    return &{{.Ret.Name}}, cacheDuration, err
     }
 	if q.cache == nil {
 		rv, _, err := dbRead()

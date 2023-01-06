@@ -46,7 +46,7 @@ func (q *Queries) Complicated(ctx context.Context, n int32) (*int32, error) {
 		if err == pgx.ErrNoRows {
 			return (*int32)(nil), cacheDuration, nil
 		}
-		return x, cacheDuration, err
+		return &x, cacheDuration, err
 	}
 	if q.cache == nil {
 		rv, _, err := dbRead()
@@ -101,7 +101,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams, getU
 		if err == pgx.ErrNoRows {
 			return (*User)(nil), cacheDuration, nil
 		}
-		return i, cacheDuration, err
+		return &i, cacheDuration, err
 	}
 	if q.cache == nil {
 		rv, _, err := dbRead()
@@ -197,7 +197,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (*User, error) {
 		if err == pgx.ErrNoRows {
 			return (*User)(nil), cacheDuration, nil
 		}
-		return i, cacheDuration, err
+		return &i, cacheDuration, err
 	}
 	if q.cache == nil {
 		rv, _, err := dbRead()
@@ -236,7 +236,7 @@ func (q *Queries) GetUserByName(ctx context.Context, name string) (*User, error)
 		if err == pgx.ErrNoRows {
 			return (*User)(nil), cacheDuration, nil
 		}
-		return i, cacheDuration, err
+		return &i, cacheDuration, err
 	}
 	if q.cache == nil {
 		rv, _, err := dbRead()
