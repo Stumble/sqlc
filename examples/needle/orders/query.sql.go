@@ -11,8 +11,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/rs/zerolog/log"
 )
 
 const createAuthor = `-- name: CreateAuthor :one
@@ -29,42 +30,23 @@ type CreateAuthorParams struct {
 	Itemid int32
 }
 
-// CacheKey - cache key
-func (arg CreateAuthorParams) CacheKey() string {
-	prefix := "orders:CreateAuthor:"
-	return prefix + fmt.Sprintf("%+v,%+v", arg.Userid, arg.Itemid)
-}
-
 func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Order, error) {
-	// TODO(mustRevalidate, noStore)
-	dbRead := func() (any, time.Duration, error) {
-		cacheDuration := time.Duration(time.Millisecond * 0)
-		row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Userid, arg.Itemid)
-		var i Order
-		err := row.Scan(
-			&i.ID,
-			&i.Userid,
-			&i.Itemid,
-			&i.CreatedAt,
-			&i.Isdeleted,
-		)
-		if err == pgx.ErrNoRows {
-			return (*Order)(nil), cacheDuration, nil
-		}
-		return &i, cacheDuration, err
-	}
-	if q.cache == nil {
-		rv, _, err := dbRead()
-		return rv.(*Order), err
-	}
-
-	var rv *Order
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &rv, dbRead, false, false)
-	if err != nil {
+	row := q.db.WQueryRow(ctx, "CreateAuthor", createAuthor, arg.Userid, arg.Itemid)
+	var i *Order = new(Order)
+	err := row.Scan(
+		&i.ID,
+		&i.Userid,
+		&i.Itemid,
+		&i.CreatedAt,
+		&i.Isdeleted,
+	)
+	if err == pgx.ErrNoRows {
+		return (*Order)(nil), nil
+	} else if err != nil {
 		return nil, err
 	}
 
-	return rv, err
+	return i, err
 }
 
 const deleteOrder = `-- name: DeleteOrder :exec
@@ -121,11 +103,10 @@ type GetOrderByIDRow struct {
 
 // -- cache : 10m
 func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
-	// TODO(mustRevalidate, noStore)
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 600000)
 		row := q.db.WQueryRow(ctx, "GetOrderByID", getOrderByID)
-		var i GetOrderByIDRow
+		var i *GetOrderByIDRow = new(GetOrderByIDRow)
 		err := row.Scan(
 			&i.ID,
 			&i.Userid,
@@ -142,20 +123,20 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 		if err == pgx.ErrNoRows {
 			return (*GetOrderByIDRow)(nil), cacheDuration, nil
 		}
-		return &i, cacheDuration, err
+		return i, cacheDuration, err
 	}
 	if q.cache == nil {
-		rv, _, err := dbRead()
-		return rv.(*GetOrderByIDRow), err
+		i, _, err := dbRead()
+		return i.(*GetOrderByIDRow), err
 	}
 
-	var rv *GetOrderByIDRow
-	err := q.cache.GetWithTtl(ctx, "orders:GetOrderByID", &rv, dbRead, false, false)
+	var i *GetOrderByIDRow
+	err := q.cache.GetWithTtl(ctx, "orders:GetOrderByID", i, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return rv, err
+	return i, err
 }
 
 const listOrdersByGender = `-- name: ListOrdersByGender :many
@@ -192,7 +173,7 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 		defer rows.Close()
 		var items []Order
 		for rows.Next() {
-			var i Order
+			var i *Order = new(Order)
 			if err := rows.Scan(
 				&i.ID,
 				&i.Userid,
@@ -202,7 +183,7 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 			); err != nil {
 				return nil, 0, err
 			}
-			items = append(items, i)
+			items = append(items, *i)
 		}
 		if err := rows.Err(); err != nil {
 			return nil, 0, err
@@ -213,7 +194,6 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 		items, _, err := dbRead()
 		return items.([]Order), err
 	}
-
 	var items []Order
 	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
@@ -237,47 +217,27 @@ type ListOrdersByUserParams struct {
 	First  int32
 }
 
-// CacheKey - cache key
-func (arg ListOrdersByUserParams) CacheKey() string {
-	prefix := "orders:ListOrdersByUser:"
-	return prefix + fmt.Sprintf("%+v,%+v,%+v", arg.Userid, arg.After, arg.First)
-}
-
 func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserParams) ([]Order, error) {
-	dbRead := func() (any, time.Duration, error) {
-		cacheDuration := time.Duration(time.Millisecond * 0)
-		rows, err := q.db.WQuery(ctx, "ListOrdersByUser", listOrdersByUser, arg.Userid, arg.After, arg.First)
-		if err != nil {
-			return nil, 0, err
-		}
-		defer rows.Close()
-		var items []Order
-		for rows.Next() {
-			var i Order
-			if err := rows.Scan(
-				&i.ID,
-				&i.Userid,
-				&i.Itemid,
-				&i.CreatedAt,
-				&i.Isdeleted,
-			); err != nil {
-				return nil, 0, err
-			}
-			items = append(items, i)
-		}
-		if err := rows.Err(); err != nil {
-			return nil, 0, err
-		}
-		return items, cacheDuration, nil
-	}
-	if q.cache == nil {
-		items, _, err := dbRead()
-		return items.([]Order), err
-	}
-
-	var items []Order
-	err := q.cache.GetWithTtl(ctx, arg.CacheKey(), &items, dbRead, false, false)
+	rows, err := q.db.WQuery(ctx, "ListOrdersByUser", listOrdersByUser, arg.Userid, arg.After, arg.First)
 	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Order
+	for rows.Next() {
+		var i *Order = new(Order)
+		if err := rows.Scan(
+			&i.ID,
+			&i.Userid,
+			&i.Itemid,
+			&i.CreatedAt,
+			&i.Isdeleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, *i)
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -329,3 +289,9 @@ func (q *Queries) Load(ctx context.Context, data []byte) error {
 	}
 	return nil
 }
+
+// eliminate unused error
+var _ = log.Logger
+var _ = fmt.Sprintf("")
+var _ = time.Now()
+var _ = json.RawMessage{}

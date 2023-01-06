@@ -190,7 +190,7 @@ func buildImports(settings *plugin.Settings, queries []Query, uses func(string) 
 	}
 
 	if uses("pgtype.") {
-		if sqlpkg == SQLDriverPGXV5 {
+		if sqlpkg == SQLDriverPGXV5 || sqlpkg == SQLDriverWPGX {
 			pkg[ImportSpec{Path: "github.com/jackc/pgx/v5/pgtype"}] = struct{}{}
 		} else {
 			pkg[ImportSpec{Path: "github.com/jackc/pgtype"}] = struct{}{}
@@ -384,6 +384,10 @@ func (i *importer) queryImports(filename string) fileImports {
 	sqlpkg := parseDriver(i.Settings.Go.SqlPackage)
 	if sliceScan() && !sqlpkg.IsPGX() {
 		pkg[ImportSpec{Path: "github.com/lib/pq"}] = struct{}{}
+	}
+
+	if sqlpkg == SQLDriverWPGX {
+		pkg[ImportSpec{Path: "github.com/rs/zerolog/log"}] = struct{}{}
 	}
 
 	return sortedImports(std, pkg)
