@@ -52,7 +52,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 		if err == pgx.ErrNoRows {
 			return (*Order)(nil), cacheDuration, nil
 		}
-		return i, cacheDuration, err
+		return &i, cacheDuration, err
 	}
 	if q.cache == nil {
 		rv, _, err := dbRead()
@@ -143,7 +143,7 @@ func (q *Queries) GetOrderByID(ctx context.Context) (*GetOrderByIDRow, error) {
 		if err == pgx.ErrNoRows {
 			return (*GetOrderByIDRow)(nil), cacheDuration, nil
 		}
-		return i, cacheDuration, err
+		return &i, cacheDuration, err
 	}
 	if q.cache == nil {
 		rv, _, err := dbRead()
