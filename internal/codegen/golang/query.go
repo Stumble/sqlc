@@ -162,7 +162,7 @@ func (v QueryValue) Scan() string {
 		if strings.HasPrefix(v.Typ, "[]") && v.Typ != "[]byte" && !v.SQLDriver.IsPGX() {
 			out = append(out, "pq.Array(&"+v.Name+")")
 		} else {
-			out = append(out, "&"+v.Name)
+			out = append(out, v.Name)
 		}
 	} else {
 		for _, f := range v.Struct.Fields {
