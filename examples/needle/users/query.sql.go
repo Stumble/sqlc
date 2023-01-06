@@ -336,6 +336,28 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	return items, err
 }
 
+const updateMetaByID = `-- name: UpdateMetaByID :execrows
+UPDATE users
+SET
+  Metadata = $1
+WHERE
+  ID = $2
+`
+
+type UpdateMetaByIDParams struct {
+	Metadata []byte
+	ID       int32
+}
+
+func (q *Queries) UpdateMetaByID(ctx context.Context, arg UpdateMetaByIDParams) (int64, error) {
+	result, err := q.db.WExec(ctx, "UpdateMetaByID", updateMetaByID, arg.Metadata, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected(), nil
+}
+
 const updateNameByID = `-- name: UpdateNameByID :one
 UPDATE users
 SET

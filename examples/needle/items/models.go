@@ -86,6 +86,7 @@ type Item struct {
 	Category    Itemcategory   `json:"category"`
 	Price       pgtype.Numeric `json:"price"`
 	Thumbnail   string         `json:"thumbnail"`
+	Qrcode      *string        `json:"qrcode"`
 	Metadata    []byte         `json:"metadata"`
 	CreatedAt   time.Time      `json:"createdat"`
 	UpdatedAt   time.Time      `json:"updatedat"`
