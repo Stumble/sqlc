@@ -56,6 +56,19 @@ func (q *Queries) GetTopItems(ctx context.Context) ([]VItem, error) {
 	return items, err
 }
 
+const refresh = `-- name: Refresh :exec
+REFRESH MATERIALIZED VIEW CONCURRENTLY v_items
+`
+
+func (q *Queries) Refresh(ctx context.Context) error {
+	_, err := q.db.WExec(ctx, "Refresh", refresh)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 //// auto generated functions
 
 func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
