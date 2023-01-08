@@ -356,8 +356,9 @@ func (m *Table) CloneVT() *Table {
 		return (*Table)(nil)
 	}
 	r := &Table{
-		Rel:     m.Rel.CloneVT(),
-		Comment: m.Comment,
+		Rel:           m.Rel.CloneVT(),
+		Comment:       m.Comment,
+		GenerateModel: m.GenerateModel,
 	}
 	if rhs := m.Columns; rhs != nil {
 		tmpContainer := make([]*Column, len(rhs))
@@ -1162,6 +1163,9 @@ func (this *Table) EqualVT(that *Table) bool {
 		}
 	}
 	if this.Comment != that.Comment {
+		return false
+	}
+	if this.GenerateModel != that.GenerateModel {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -2593,6 +2597,16 @@ func (m *Table) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.GenerateModel {
+		i--
+		if m.GenerateModel {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x20
 	}
 	if len(m.Comment) > 0 {
 		i -= len(m.Comment)
@@ -4367,6 +4381,16 @@ func (m *Table) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.GenerateModel {
+		i--
+		if m.GenerateModel {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x20
+	}
 	if len(m.Comment) > 0 {
 		i -= len(m.Comment)
 		copy(dAtA[i:], m.Comment)
@@ -5508,6 +5532,9 @@ func (m *Table) SizeVT() (n int) {
 	l = len(m.Comment)
 	if l > 0 {
 		n += 1 + l + sov(uint64(l))
+	}
+	if m.GenerateModel {
+		n += 2
 	}
 	n += len(m.unknownFields)
 	return n
@@ -8788,6 +8815,26 @@ func (m *Table) UnmarshalVT(dAtA []byte) error {
 			}
 			m.Comment = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GenerateModel", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.GenerateModel = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])

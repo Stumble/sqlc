@@ -187,8 +187,9 @@ func pluginCatalog(c *catalog.Catalog) *plugin.Catalog {
 					Schema:  t.Rel.Schema,
 					Name:    t.Rel.Name,
 				},
-				Columns: columns,
-				Comment: t.Comment,
+				Columns:       columns,
+				Comment:       t.Comment,
+				GenerateModel: t.GenerateModel,
 			})
 		}
 		schemas = append(schemas, &plugin.Schema{

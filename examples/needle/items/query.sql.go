@@ -43,20 +43,7 @@ type CreateItemsParams struct {
 	Metadata    []byte
 }
 
-type CreateItemsRow struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Qrcode      *string
-	Metadata    []byte
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*CreateItemsRow, error) {
+func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Item, error) {
 	row := q.db.WQueryRow(ctx, "CreateItems", createItems,
 		arg.Name,
 		arg.Description,
@@ -65,7 +52,7 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Crea
 		arg.Thumbnail,
 		arg.Metadata,
 	)
-	var i *CreateItemsRow = new(CreateItemsRow)
+	var i *Item = new(Item)
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -79,7 +66,7 @@ func (q *Queries) CreateItems(ctx context.Context, arg CreateItemsParams) (*Crea
 		&i.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
-		return (*CreateItemsRow)(nil), nil
+		return (*Item)(nil), nil
 	} else if err != nil {
 		return nil, err
 	}
@@ -129,25 +116,12 @@ SELECT id, name, description, category, price, thumbnail, qrcode, metadata, crea
 WHERE id = $1 LIMIT 1
 `
 
-type GetItemByIDRow struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Qrcode      *string
-	Metadata    []byte
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
 // -- cache : 5m
-func (q *Queries) GetItemByID(ctx context.Context, id int64) (*GetItemByIDRow, error) {
+func (q *Queries) GetItemByID(ctx context.Context, id int64) (*Item, error) {
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 300000)
 		row := q.db.WQueryRow(ctx, "GetItemByID", getItemByID, id)
-		var i *GetItemByIDRow = new(GetItemByIDRow)
+		var i *Item = new(Item)
 		err := row.Scan(
 			&i.ID,
 			&i.Name,
@@ -161,16 +135,16 @@ func (q *Queries) GetItemByID(ctx context.Context, id int64) (*GetItemByIDRow, e
 			&i.UpdatedAt,
 		)
 		if err == pgx.ErrNoRows {
-			return (*GetItemByIDRow)(nil), cacheDuration, nil
+			return (*Item)(nil), cacheDuration, nil
 		}
 		return i, cacheDuration, err
 	}
 	if q.cache == nil {
 		i, _, err := dbRead()
-		return i.(*GetItemByIDRow), err
+		return i.(*Item), err
 	}
 
-	var i *GetItemByIDRow
+	var i *Item
 	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("items:GetItemByID:%+v", id), i, dbRead, false, false)
 	if err != nil {
 		return nil, err
@@ -191,28 +165,15 @@ type ListItemsParams struct {
 	First int32
 }
 
-type ListItemsRow struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Qrcode      *string
-	Metadata    []byte
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
+func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]Item, error) {
 	rows, err := q.db.WQuery(ctx, "ListItems", listItems, arg.After, arg.First)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListItemsRow
+	var items []Item
 	for rows.Next() {
-		var i *ListItemsRow = new(ListItemsRow)
+		var i *Item = new(Item)
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -241,28 +202,15 @@ SELECT id, name, description, category, price, thumbnail, qrcode, metadata, crea
 WHERE id = ANY($1::bigserial[])
 `
 
-type ListSomeItemsRow struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Qrcode      *string
-	Metadata    []byte
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]ListSomeItemsRow, error) {
+func (q *Queries) ListSomeItems(ctx context.Context, ids []int64) ([]Item, error) {
 	rows, err := q.db.WQuery(ctx, "ListSomeItems", listSomeItems, ids)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListSomeItemsRow
+	var items []Item
 	for rows.Next() {
-		var i *ListSomeItemsRow = new(ListSomeItemsRow)
+		var i *Item = new(Item)
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -291,21 +239,8 @@ SELECT id, name, description, category, price, thumbnail, qrcode, metadata, crea
 WHERE Name LIKE $1
 `
 
-type SearchItemsRow struct {
-	ID          int64
-	Name        string
-	Description string
-	Category    Itemcategory
-	Price       pgtype.Numeric
-	Thumbnail   string
-	Qrcode      *string
-	Metadata    []byte
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
 // -- cache : 100ms
-func (q *Queries) SearchItems(ctx context.Context, name string) ([]SearchItemsRow, error) {
+func (q *Queries) SearchItems(ctx context.Context, name string) ([]Item, error) {
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 100)
 		rows, err := q.db.WQuery(ctx, "SearchItems", searchItems, name)
@@ -313,9 +248,9 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]SearchItemsRo
 			return nil, 0, err
 		}
 		defer rows.Close()
-		var items []SearchItemsRow
+		var items []Item
 		for rows.Next() {
-			var i *SearchItemsRow = new(SearchItemsRow)
+			var i *Item = new(Item)
 			if err := rows.Scan(
 				&i.ID,
 				&i.Name,
@@ -339,9 +274,9 @@ func (q *Queries) SearchItems(ctx context.Context, name string) ([]SearchItemsRo
 	}
 	if q.cache == nil {
 		items, _, err := dbRead()
-		return items.([]SearchItemsRow), err
+		return items.([]Item), err
 	}
-	var items []SearchItemsRow
+	var items []Item
 	err := q.cache.GetWithTtl(ctx, fmt.Sprintf("items:SearchItems:%+v", name), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
@@ -389,15 +324,15 @@ func (q *Queries) UpdateQRCode(ctx context.Context, arg UpdateQRCodeParams, getI
 //// auto generated functions
 
 func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
-	sql := "SELECT id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat FROM items_id_le_1000 ORDER BY id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat ASC;"
+	sql := "SELECT id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat FROM items ORDER BY id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat ASC;"
 	rows, err := q.db.WQuery(ctx, "Dump", sql)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ItemsIDLe1000
+	var items []Item
 	for rows.Next() {
-		var v ItemsIDLe1000
+		var v Item
 		if err := rows.Scan(&v.ID, &v.Name, &v.Description, &v.Category, &v.Price, &v.Thumbnail, &v.Qrcode, &v.Metadata, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -417,8 +352,8 @@ func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, e
 }
 
 func (q *Queries) Load(ctx context.Context, data []byte) error {
-	sql := "INSERT INTO items_id_le_1000 (id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);"
-	rows := make([]ItemsIDLe1000, 0)
+	sql := "INSERT INTO items (id,name,description,category,price,thumbnail,qrcode,metadata,createdat,updatedat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);"
+	rows := make([]Item, 0)
 	err := json.Unmarshal(data, &rows)
 	if err != nil {
 		return err

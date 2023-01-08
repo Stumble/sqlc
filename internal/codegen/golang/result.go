@@ -77,6 +77,11 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 			continue
 		}
 		for _, table := range schema.Tables {
+			// only the last table schema, which is the first table creation SQL in sqlc.yaml file
+			// in the `schema: []` array, will be generated.
+			if !table.GenerateModel {
+				continue
+			}
 			var tableName string
 			if schema.Name == req.Catalog.DefaultSchema {
 				tableName = table.Rel.Name
@@ -113,11 +118,6 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 			}
 			structs = append(structs, s)
 		}
-	}
-	if len(structs) > 0 {
-		// only the last table schema, which is the first table creation SQL in sqlc.yaml file
-		// in the `schema: []` array, will be generated.
-		structs = structs[len(structs) - 1:]
 	}
 	return structs
 }
