@@ -389,3 +389,13 @@ func (c *Catalog) createTableAs(stmt *ast.CreateTableAsStmt, colGen columnGenera
 
 	return nil
 }
+
+func (c *Catalog) IsCreatingNewTableLayout(stmt ast.Statement) bool {
+	switch n := stmt.Raw.Stmt.(type) {
+	case *ast.CreateTableStmt:
+		return len(n.Cols) > 0
+	case *ast.CreateTableAsStmt:
+		return true
+	}
+	return false
+}
