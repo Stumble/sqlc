@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.16.0
 
-package orders
+package listings
 
 import (
 	"database/sql/driver"
@@ -77,11 +77,10 @@ func AllItemcategoryValues() []Itemcategory {
 	}
 }
 
-type Order struct {
-	ID        int32     `json:"id"`
-	Userid    int32     `json:"userid"`
+type Listing struct {
+	ID        int64     `json:"id"`
 	Itemid    int32     `json:"itemid"`
+	Makerid   int32     `json:"makerid"`
 	Price     int64     `json:"price"`
 	CreatedAt time.Time `json:"createdat"`
-	Isdeleted bool      `json:"isdeleted"`
 }

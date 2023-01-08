@@ -22,7 +22,7 @@ INSERT INTO Orders (
 ) VALUES (
   $1, $2, FALSE
 )
-RETURNING id, userid, itemid, createdat, isdeleted
+RETURNING id, userid, itemid, price, createdat, isdeleted
 `
 
 type CreateAuthorParams struct {
@@ -37,6 +37,7 @@ func (q *Queries) CreateAuthor(ctx context.Context, arg CreateAuthorParams) (*Or
 		&i.ID,
 		&i.Userid,
 		&i.Itemid,
+		&i.Price,
 		&i.CreatedAt,
 		&i.Isdeleted,
 	)
@@ -143,7 +144,7 @@ const listOrdersByGender = `-- name: ListOrdersByGender :many
 WITH UsersByGender AS (
   SELECT id, name, metadata, thumbnail, createdat FROM Users WHERE Users.Metadata->>'gender' = $3::text
 )
-SELECT id, userid, itemid, createdat, isdeleted FROM Orders
+SELECT id, userid, itemid, price, createdat, isdeleted FROM Orders
 WHERE
   UserId IN (SELECT id FROM UsersByGender) AND Orders.ID > $1
 LIMIT $2
@@ -178,6 +179,7 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 				&i.ID,
 				&i.Userid,
 				&i.Itemid,
+				&i.Price,
 				&i.CreatedAt,
 				&i.Isdeleted,
 			); err != nil {
@@ -204,7 +206,7 @@ func (q *Queries) ListOrdersByGender(ctx context.Context, arg ListOrdersByGender
 }
 
 const listOrdersByUser = `-- name: ListOrdersByUser :many
-SELECT id, userid, itemid, createdat, isdeleted FROM Orders
+SELECT id, userid, itemid, price, createdat, isdeleted FROM Orders
 WHERE
   UserID = $1 AND CreatedAt < $2
 ORDER BY CreatedAt DESC
@@ -230,6 +232,7 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 			&i.ID,
 			&i.Userid,
 			&i.Itemid,
+			&i.Price,
 			&i.CreatedAt,
 			&i.Isdeleted,
 		); err != nil {
@@ -247,7 +250,7 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 //// auto generated functions
 
 func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, error) {
-	sql := "SELECT id,userid,itemid,createdat,isdeleted FROM orders ORDER BY id,userid,itemid,createdat,isdeleted ASC;"
+	sql := "SELECT id,userid,itemid,price,createdat,isdeleted FROM orders ORDER BY id,userid,itemid,price,createdat,isdeleted ASC;"
 	rows, err := q.db.WQuery(ctx, "Dump", sql)
 	if err != nil {
 		return nil, err
@@ -256,7 +259,7 @@ func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, e
 	var items []Order
 	for rows.Next() {
 		var v Order
-		if err := rows.Scan(&v.ID, &v.Userid, &v.Itemid, &v.CreatedAt, &v.Isdeleted); err != nil {
+		if err := rows.Scan(&v.ID, &v.Userid, &v.Itemid, &v.Price, &v.CreatedAt, &v.Isdeleted); err != nil {
 			return nil, err
 		}
 		for _, applyBeforeDump := range beforeDump {
@@ -275,14 +278,14 @@ func (q *Queries) Dump(ctx context.Context, beforeDump ...BeforeDump) ([]byte, e
 }
 
 func (q *Queries) Load(ctx context.Context, data []byte) error {
-	sql := "INSERT INTO orders (id,userid,itemid,createdat,isdeleted) VALUES ($1,$2,$3,$4,$5);"
+	sql := "INSERT INTO orders (id,userid,itemid,price,createdat,isdeleted) VALUES ($1,$2,$3,$4,$5,$6);"
 	rows := make([]Order, 0)
 	err := json.Unmarshal(data, &rows)
 	if err != nil {
 		return err
 	}
 	for _, row := range rows {
-		_, err := q.db.WExec(ctx, "Load", sql, row.ID, row.Userid, row.Itemid, row.CreatedAt, row.Isdeleted)
+		_, err := q.db.WExec(ctx, "Load", sql, row.ID, row.Userid, row.Itemid, row.Price, row.CreatedAt, row.Isdeleted)
 		if err != nil {
 			return err
 		}

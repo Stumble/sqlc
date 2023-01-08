@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.16.0
 
-package orders
+package listings
 
 import (
 	"context"
@@ -27,7 +27,7 @@ type WGConn interface {
 type ReadWithTtlFunc = func() (any, time.Duration, error)
 
 // BeforeDump allows you to edit result before dump.
-type BeforeDump func(m *Order)
+type BeforeDump func(m *Listing)
 
 type Cache interface {
 	GetWithTtl(
@@ -61,15 +61,15 @@ func (q *Queries) WithCache(cache Cache) *Queries {
 }
 
 var Schema = `
-CREATE TABLE IF NOT EXISTS Orders (
-   ID        INT GENERATED ALWAYS AS IDENTITY,
-   UserID    INT references Users(ID) NOT NULL,
-   ItemID    INT references Items(ID) NOT NULL,
-   Price     BIGINT NOT NULL,
+CREATE TABLE IF NOT EXISTS Listings (
+   ID        bigserial GENERATED  ALWAYS AS IDENTITY,
+   ItemID    INT       references Items(ID) NOT NULL,
+   MakerID   INT       references Users(ID) NOT NULL,
+   Price     BIGINT    NOT NULL,
    CreatedAt TIMESTAMP NOT NULL DEFAULT NOW(),
-   IsDeleted BOOLEAN NOT NULL,
    PRIMARY KEY(ID)
 );
 
-CREATE INDEX orders_item_id_idx ON orders (ItemID);
+CREATE INDEX IF NOT EXISTS listings_item_id_id_idx
+    ON Listings (ItemID, ID);
 `

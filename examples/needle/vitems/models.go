@@ -2,12 +2,14 @@
 // versions:
 //   sqlc v1.16.0
 
-package orders
+package vitems
 
 import (
 	"database/sql/driver"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Itemcategory string
@@ -77,11 +79,18 @@ func AllItemcategoryValues() []Itemcategory {
 	}
 }
 
-type Order struct {
-	ID        int32     `json:"id"`
-	Userid    int32     `json:"userid"`
-	Itemid    int32     `json:"itemid"`
-	Price     int64     `json:"price"`
-	CreatedAt time.Time `json:"createdat"`
-	Isdeleted bool      `json:"isdeleted"`
+type VItem struct {
+	ID            int64          `json:"id"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	Category      Itemcategory   `json:"category"`
+	Price         pgtype.Numeric `json:"price"`
+	Thumbnail     string         `json:"thumbnail"`
+	Qrcode        *string        `json:"qrcode"`
+	Metadata      []byte         `json:"metadata"`
+	CreatedAt     time.Time      `json:"createdat"`
+	UpdatedAt     time.Time      `json:"updatedat"`
+	Totalvolume   int64          `json:"totalvolume"`
+	Last30dvolume int64          `json:"last30dvolume"`
+	Floorprice    int64          `json:"floorprice"`
 }
