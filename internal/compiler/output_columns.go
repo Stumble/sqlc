@@ -89,6 +89,8 @@ func outputColumns(qc *QueryCatalog, node ast.Node) ([]*Column, error) {
 		targets = &ast.List{}
 	case *ast.UpdateStmt:
 		targets = n.ReturningList
+	case *ast.RefreshMatViewStmt:
+		targets = &ast.List{}
 	default:
 		return nil, fmt.Errorf("outputColumns: unsupported node type: %T", n)
 	}
@@ -428,6 +430,8 @@ func sourceTables(qc *QueryCatalog, node ast.Node) ([]*Table, error) {
 			Items: append(n.FromClause.Items, n.Relations.Items...),
 		}
 	case *ast.CallStmt:
+		list = &ast.List{}
+	case *ast.RefreshMatViewStmt:
 		list = &ast.List{}
 	default:
 		return nil, fmt.Errorf("sourceTables: unsupported node type: %T", n)

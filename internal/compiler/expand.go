@@ -70,6 +70,8 @@ func (c *Compiler) expandStmt(qc *QueryCatalog, raw *ast.RawStmt, node ast.Node)
 		targets = n.TargetList
 	case *ast.UpdateStmt:
 		targets = n.ReturningList
+	case *ast.RefreshMatViewStmt:
+		targets = nil
 	default:
 		return nil, fmt.Errorf("outputColumns: unsupported node type: %T", n)
 	}
