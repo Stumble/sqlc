@@ -36,14 +36,14 @@ func New(defaultSchema string) *Catalog {
 
 func (c *Catalog) Build(stmts []ast.Statement) error {
 	for i := range stmts {
-		if err := c.Update(stmts[i], nil); err != nil {
+		if err := c.Update(stmts[i], nil, true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Catalog) Update(stmt ast.Statement, colGen columnGenerator) error {
+func (c *Catalog) Update(stmt ast.Statement, colGen columnGenerator, genModelFromTable bool) error {
 	if stmt.Raw == nil {
 		return nil
 	}
@@ -90,10 +90,10 @@ func (c *Catalog) Update(stmt ast.Statement, colGen columnGenerator) error {
 		err = c.createSchema(n)
 
 	case *ast.CreateTableStmt:
-		err = c.createTable(n)
+		err = c.createTable(n, genModelFromTable)
 
 	case *ast.CreateTableAsStmt:
-		err = c.createTableAs(n, colGen)
+		err = c.createTableAs(n, colGen, genModelFromTable)
 
 	case *ast.ViewStmt:
 		err = c.createView(n, colGen)
@@ -127,7 +127,7 @@ func (c *Catalog) Update(stmt ast.Statement, colGen columnGenerator) error {
 					StmtLocation: stmt.Raw.StmtLocation,
 					StmtLen:      stmt.Raw.StmtLen,
 				},
-			}, colGen); err != nil {
+			}, colGen, genModelFromTable); err != nil {
 				return err
 			}
 		}
