@@ -13,9 +13,10 @@ import (
 // A database table is a collection of related data held in a table format within a database.
 // It consists of columns and rows.
 type Table struct {
-	Rel     *ast.TableName
-	Columns []*Column
-	Comment string
+	Rel           *ast.TableName
+	Columns       []*Column
+	Comment       string
+	GenerateModel bool
 }
 
 func (table *Table) isExistColumn(cmd *ast.AlterTableCmd) (int, error) {
@@ -223,7 +224,7 @@ func (c *Catalog) alterTableSetSchema(stmt *ast.AlterTableSetSchemaStmt) error {
 	return nil
 }
 
-func (c *Catalog) createTable(stmt *ast.CreateTableStmt) error {
+func (c *Catalog) createTable(stmt *ast.CreateTableStmt, genModel bool) error {
 	ns := stmt.Name.Schema
 	if ns == "" {
 		ns = c.DefaultSchema
@@ -239,7 +240,7 @@ func (c *Catalog) createTable(stmt *ast.CreateTableStmt) error {
 		return sqlerr.RelationExists(stmt.Name.Name)
 	}
 
-	tbl := Table{Rel: stmt.Name, Comment: stmt.Comment}
+	tbl := Table{Rel: stmt.Name, Comment: stmt.Comment, GenerateModel: genModel}
 	for _, inheritTable := range stmt.Inherits {
 		t, _, err := schema.getTable(inheritTable)
 		if err != nil {
@@ -348,7 +349,7 @@ func (c *Catalog) renameTable(stmt *ast.RenameTableStmt) error {
 	return nil
 }
 
-func (c *Catalog) createTableAs(stmt *ast.CreateTableAsStmt, colGen columnGenerator) error {
+func (c *Catalog) createTableAs(stmt *ast.CreateTableAsStmt, colGen columnGenerator, genModel bool) error {
 	cols, err := colGen.OutputColumns(stmt.Query)
 	if err != nil {
 		return err
@@ -370,6 +371,7 @@ func (c *Catalog) createTableAs(stmt *ast.CreateTableAsStmt, colGen columnGenera
 			Name:    *stmt.Into.Rel.Relname,
 		},
 		Columns: cols,
+		GenerateModel: genModel,
 	}
 
 	ns := tbl.Rel.Schema
