@@ -30,8 +30,13 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 	if err != nil {
 		return err
 	}
+	// XXX(yumin): reverse the order
+	orderReversedFiles := make([]string, len(files))
+	for i := range files {
+		orderReversedFiles[len(files)-1-i] = files[i]
+	}
 	merr := multierr.New()
-	for i, filename := range files {
+	for i, filename := range orderReversedFiles {
 		blob, err := os.ReadFile(filename)
 		if err != nil {
 			merr.Add(filename, "", 0, err)
@@ -43,18 +48,21 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 			merr.Add(filename, contents, 0, err)
 			continue
 		}
+		tableDefined := false
 		for i := range stmts {
 			if err := c.catalog.Update(stmts[i], c); err != nil {
 				merr.Add(filename, contents, stmts[i].Pos(), err)
 				continue
 			}
+			definingTable := c.catalog.IsCreatingNewTableLayout(stmts[i])
+			if tableDefined && definingTable {
+				merr.Add(filename, contents, stmts[i].Pos(),
+					fmt.Errorf("only one table creation is allowed per schema.sql file"))
+			}
+			tableDefined = tableDefined || definingTable
 		}
-		// XXX(yumin): only the first schema file is added.
-		// TODO(yumin): allow more schema to be added and filter them by the type of SQL.
-		// For example,
-		// + type/function declaration: does not support IF NOT EXISTS by default.
-		// + table/partition declaration: okay to duplicated by using IF NOT EXISTS.
-		if i == 0 {
+		// XXX(yumin): only the first schema file in the original order is added.
+		if i == len(orderReversedFiles)-1 {
 			c.catalog.AddRawSQL(contents)
 		}
 	}

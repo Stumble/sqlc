@@ -2,7 +2,6 @@ package golang
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -72,7 +71,6 @@ func buildEnums(req *plugin.CodeGenRequest) []Enum {
 }
 
 func buildStructs(req *plugin.CodeGenRequest) []Struct {
-	haveBuiltOne := false
 	var structs []Struct
 	for _, schema := range req.Catalog.Schemas {
 		if schema.Name == "pg_catalog" || schema.Name == "information_schema" {
@@ -84,11 +82,6 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				tableName = table.Rel.Name
 			} else {
 				tableName = schema.Name + "_" + table.Rel.Name
-			}
-			if haveBuiltOne {
-				log.Printf(
-					"Forked version will only build the first struct, skipping: %s ", tableName)
-				continue
 			}
 			structName := tableName
 			if !req.Settings.Go.EmitExactTableNames {
@@ -119,11 +112,12 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				})
 			}
 			structs = append(structs, s)
-			haveBuiltOne = true
 		}
 	}
 	if len(structs) > 0 {
-		sort.Slice(structs, func(i, j int) bool { return structs[i].Name < structs[j].Name })
+		// only the last table schema, which is the first table creation SQL in sqlc.yaml file
+		// in the `schema: []` array, will be generated.
+		structs = structs[len(structs) - 1:]
 	}
 	return structs
 }
