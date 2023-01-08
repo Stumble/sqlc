@@ -17,7 +17,7 @@ sql:
   queries: "users/query.sql"
   engine: "postgresql"
   gen:
-    go: 
+    go:
       sql_package: "wpgx"
       package: "users"
       out: "users"
@@ -25,7 +25,7 @@ sql:
   queries: "items/query.sql"
   engine: "postgresql"
   gen:
-    go: 
+    go:
       sql_package: "wpgx"
       package: "items"
       out: "items"
@@ -33,7 +33,23 @@ sql:
   queries: "orders/query.sql"
   engine: "postgresql"
   gen:
-    go: 
+    go:
       sql_package: "wpgx"
       package: "orders"
       out: "orders"
+- schema: ["listings/schema.sql", "items/schema.sql", "users/schema.sql"]
+  queries: "listings/query.sql"
+  engine: "postgresql"
+  gen:
+    go:
+      sql_package: "wpgx"
+      package: "listings"
+      out: "listings"
+- schema: ["vitems/schema.sql", "items/schema.sql", "listings/schema.sql", "orders/schema.sql"]
+  queries: "vitems/query.sql"
+  engine: "postgresql"
+  gen:
+    go:
+      sql_package: "wpgx"
+      package: "vitems"
+      out: "vitems"
