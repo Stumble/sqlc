@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.16.0
 
-package orders
+package vitems
 
 import (
 	"context"
@@ -27,7 +27,7 @@ type WGConn interface {
 type ReadWithTtlFunc = func() (any, time.Duration, error)
 
 // BeforeDump allows you to edit result before dump.
-type BeforeDump func(m *Order)
+type BeforeDump func(m *VItem)
 
 type Cache interface {
 	GetWithTtl(
@@ -61,15 +61,39 @@ func (q *Queries) WithCache(cache Cache) *Queries {
 }
 
 var Schema = `
-CREATE TABLE IF NOT EXISTS Orders (
-   ID        INT GENERATED ALWAYS AS IDENTITY,
-   UserID    INT references Users(ID) NOT NULL,
-   ItemID    INT references Items(ID) NOT NULL,
-   Price     BIGINT NOT NULL,
-   CreatedAt TIMESTAMP NOT NULL DEFAULT NOW(),
-   IsDeleted BOOLEAN NOT NULL,
-   PRIMARY KEY(ID)
-);
+CREATE MATERIALIZED VIEW IF NOT EXISTS v_items AS
+  SELECT
+    items.ID,
+    items.Name,
+    items.Description,
+    items.Category,
+    items.Price,
+    items.Thumbnail,
+    items.QRCode,
+    items.Metadata,
+    items.CreatedAt,
+    items.UpdatedAt,
+    sum(orders.Price) AS totalVolume,
+    sum(
+      CASE WHEN (orders.CreatedAt > now() - interval '30 day') THEN orders.Price ELSE 0 END
+    ) AS last30dVolume,
+    max(listings.Price)::bigint AS floorPrice
+  FROM
+    items
+    LEFT JOIN Orders ON items.ID = orders.ItemID
+    LEFT JOIN Listings ON items.ID = listings.ItemID
+  GROUP BY
+      items.ID;
 
-CREATE INDEX orders_item_id_idx ON orders (ItemID);
+CREATE UNIQUE INDEX v_items_id_unique_idx
+  ON v_items (ID);
+
+CREATE UNIQUE INDEX v_items_floor_price_idx
+  ON v_items (floorPrice);
+
+CREATE UNIQUE INDEX v_items_total_volume_idx
+  ON v_items (totalVolume);
+
+CREATE UNIQUE INDEX v_items_total_last_30d_volume_idx
+  ON v_items (last30dVolume);
 `
