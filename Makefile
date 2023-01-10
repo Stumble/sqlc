@@ -1,12 +1,14 @@
 CGO_ENABLED = 1
+COMMIT_HASH := $(shell git --no-pager describe --tags --always --dirty)
+LDFLAGS = "-X github.com/kyleconroy/sqlc/internal/info.Version=$(COMMIT_HASH)-wicked-fork"
 
 .PHONY: build build-endtoend test test-ci test-examples test-endtoend regen start psql mysqlsh proto
 
 build:
-	CGO_ENABLED=$(CGO_ENABLED) go build ./...
+	CGO_ENABLED=$(CGO_ENABLED) go build -ldflags=$(LDFLAGS) -o bin/ ./cmd/...
 
 install:
-	CGO_ENABLED=$(CGO_ENABLED) go install ./...
+	CGO_ENABLED=$(CGO_ENABLED) go install -ldflags=$(LDFLAGS) ./cmd/...
 
 test:
 	CGO_ENABLED=$(CGO_ENABLED) go test ./...
