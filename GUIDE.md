@@ -1,9 +1,10 @@
 # Intro
+
 Here we present a combo of using `wicked-sqlc + wpgx + dcache` that can:
 
 + Generate fully type-safe idiomatic Go code with built-in
   + memory-redis cache layer with compression and singleflight protection.
-  + telemetry: Prometheus and open-telemetry (WIP).
+  + telemetry: Prometheus and OpenTelemetry (WIP).
   + auto-generated Load and Dump function for easy golden testing.
 + Envvar configuration template for Redis and PostgreSQL.
 + A Testsuite for writing golden tests that can
@@ -16,7 +17,33 @@ NOTE: this combo is for PostgreSQL, if you are using MySQL, you can checkout thi
 as this combo.
 
 # Sqlc (this wicked fork)
+
+Although using sqlc might increase the productivities, as you no longer need to manually write the
+boilerplate codes while having cache and telemetries out of the box,
+it is **NOT** our goal.
+
+Instead, by adopting to this restricted form, we hope to:
+
++ Make it extremely easy to see all possible ways to query DB. By explicitly listing all of them
+  in the query.sql file, DBAs can examinate query patterns and design indexes wisely. In the future,
+  we might even be able to find out possible slow queries in compile time.
++ Force you think twice before creating a new query. Some bussiness logics can share the same
+  query, which means higher cache hit ratio. Sometimes when there are multiple ways to implement a
+  usecase, choose the one that can reuse existing indexes.
+
+Sometimes, you might find sqlc too *restrited*, and cannot hold the eager to
+write a function that builds the
+SQL dynamically based on conditions, **don't**  do it, unless it is a must, which is hardly true.
+In the end of the day, the so-called backend development is more or less about
+building a data-intensive software, where the most common bottleneck, is that fragile database,
+which is very costly to scale.
+
+From another perspective, the time will either be spent on (1) later, when the bussiness grew and
+the bottleneck was reached, diagnosing the problem and refactoring your database codes, while
+your customers are disappointed, or (2) before the product is launched, writing queries.
+
 ## Install
+
 ```bash
 # cgo must be enabled because: https://github.com/pganalyze/pg_query_go
 git clone https://github.com/Stumble/sqlc.git
@@ -27,14 +54,20 @@ sqlc version
 ```
 
 ## Getting started
-It is recommended to read [Sqlc doc](https://docs.sqlc.dev/en/stable/) to get the
-general idea of how to use sqlc. In the following example, we will pay more
+
+It is recommended to read [Sqlc doc](https://docs.sqlc.dev/en/stable/) to get some
+general ideas of how to use sqlc. In the following example, we will pay more
 attention to things that are different to official sqlc.
 
-Now, we will build a online bookstore, with unit tests, to demonstrate how to use this combo.
+In this tutorial, we will build a online bookstore, with unit tests, to demonstrate how to use this combo.
+The project can be found here: [bookstroe](https://github.com/Stumble/bookstore).
 
 ### Project structure
-After `go mod init`, we created a sqlc.yaml file that manages the code generation, under `pkg/repos/`. This will be the root directory for our data access layer. Also, let's start with building a table that stores book informations.
+
+After `go mod init`, we created a `sqlc.yaml` file that manages the code generation, under `pkg/repos/`.
+This will be the root directory for our data access layer.
+
+First, let's start with building a table that stores book information.
 
 ```bash
 .
@@ -46,7 +79,9 @@ After `go mod init`, we created a sqlc.yaml file that manages the code generatio
         │   └── schema.sql
         └── sqlc.yaml
 ```
-Initially, let's create a yaml configuration file looks like this:
+
+Initially, the YAML configuration file looks like this:
+
 ```yaml
 version: "2"
 sql:
@@ -59,14 +94,17 @@ sql:
       package: "books"
       out: "books"
 ```
+
 It configures sqlc to generate Go code for `books` table based on the schema and queries SQL file,
-under `books/` directory, relative to sqlc.yaml file.
+under `books/` directory, relatively to `sqlc.yaml` file.
 The only thing different from the official sqlc is the `sql_package` option. This wicked fork will
 use `wpgx` packge as the SQL driver, so you have to set `sql_packge` to this value.
 
 ### Schema
+
 A schema file is 1-to-1 mapped to a logical table. That is, you need to write 1 schema file for
 each **logical** table in DB. To be more clear:
+
 + 1 schema fiel for 1 normal physical table.
 + For **Declarative Partitioning**, the table declaration and all its partitions can be, and should
   be placed into one schema file, as they are logically one table.
@@ -74,23 +112,18 @@ each **logical** table in DB. To be more clear:
 
 You can and you should list all the **constrants and indexes** in the schema file. In the future,
 we might have some static analyze tool to check for slow queries. Also, listing them here will
-make code viewer's lives much easier.
+make code viewers' lives much easier.
 
 Different from the official sqlc, for each schema section in the sqlc.yaml file,
-only the *first* schema file in the array will be considered as source of generating Go struct.
+only the **first** schema file in the array will be considered as the source of generating Go struct.
 For example, if the config is `- schema: ["t1.sql", "t2.sql"]`,
 forked sqlc will only generate a Go struct for
 the first (and the only) table definition in `t1.sql`. If there are two table creation statements,
 sqlc will error out.
 Schema files after the first one are used as references for column types.
 
-#### Reference other schema
-If your first schema file (e.g., creating a view), or queries (e.g., joining other tables) in the
-query.sql file referenced other tables, you must list those dependencies in the schema section.
-The order of tables in the array must be a topological sort of the dependency graph.
-Another way to say it: it is just like C headers, but you list them reversely.
-
 Now let's look into `books/schema.sql` file.
+
 ```SQL
 CREATE TYPE category AS ENUM (
     'computer_science',
@@ -103,7 +136,7 @@ CREATE TABLE IF NOT EXISTS books (
    name          VARCHAR(255)        NOT NULL,
    description   VARCHAR(255)        NOT NULL,
    metadata      JSON,
-   category      ItemCategory        NOT NULL,
+   category      category            NOT NULL,
    price         DECIMAL(10,2)       NOT NULL,
    created_at    TIMESTAMP           NOT NULL DEFAULT NOW(),
    updated_at    TIMESTAMP           NOT NULL DEFAULT NOW(),
@@ -113,41 +146,185 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE INDEX IF NOT EXISTS book_name_idx ON books (name);
 CREATE INDEX IF NOT EXISTS book_category_id_idx ON books (category, id);
 ```
-Pretty simple right?
+
+We defined a table called books, using id as primary key, with two indexes.
+There are two interesting columns:
+
++ Column `category` is of type `book_category`. Sqlc will generate new type `BookCategory` in `models.go`
+  file, with `Scan` and `Value` methods to allow it to be used by the pgx driver.
+  Unlike tables, all enum types will be generated in the model file, if the schema file is referenced.
++ Column `price` will be of type `pgtype.Numeric`, which is defined in `github.com/jackc/pgx/v5/pgtype`.
+  This is because that there is no native type in GO to represent a decimal number.
+
+The generated `models.go` file would contain a struct that represents a *row* of the table.
+
+```go
+type Book struct {
+  ID          int64          `json:"id"`
+  Name        string         `json:"name"`
+  Description string         `json:"description"`
+  Metadata    []byte         `json:"metadata"`
+  Category    BookCategory   `json:"category"`
+  Price       pgtype.Numeric `json:"price"`
+  CreatedAt   time.Time      `json:"created_at"`
+  UpdatedAt   time.Time      `json:"updated_at"`
+}
+```
+
+Then, let's create another table for storing users.
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+   id          INT          GENERATED ALWAYS AS IDENTITY,
+   name        VARCHAR(255) NOT NULL,
+   metadata    JSON,
+   image       TEXT         NOT NULL,
+   created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
+   CONSTRAINT users_id_pkey PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS users_created_at_idx
+    ON Users (CreatedAt);
+CREATE UNIQUE INDEX IF NOT EXISTS users_lower_name_idx
+    ON Users ((lower(Name))) INCLUDE (ID);
+```
+
+#### Reference other schema
+
+When the schema file (e.g., creating a view),
+or the queries (e.g., joining other tables) in the
+`query.sql` file referenced other tables, you must list those dependencies in the schema section.
+The order of tables in the array must be a topological sort of the dependency graph.
+Another way to say it: it is just like C headers, but you list them reversely.
+
+For example, when creating a table of orders that looks like:
+
+```sql
+CREATE TABLE IF NOT EXISTS orders (
+   id         INT       GENERATED ALWAYS AS IDENTITY,
+   user_id    INT       references users(ID) ON DELETE SET NULL,
+   book_id    INT       references books(ID) ON DELETE SET NULL,
+   price      BIGINT    NOT NULL,
+   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+   is_deleted BOOLEAN   NOT NULL,
+   CONSTRAINT orders_id_pkey PRIMARY KEY (id)
+);
+```
+
+If we add a query that joins books and users with the order table, for example,
+
+```sql
+-- name: GetOrderByID :one
+-- -- cache : 10m
+SELECT
+  orders.ID,
+  orders.user_id,
+  orders.book_id,
+  orders.created_at,
+  users.name AS user_name,
+  users.image AS user_thumbnail,
+  books.name AS book_name,
+  books.price As book_price,
+  books.metadata As book_metadata
+FROM
+  orders
+  INNER JOIN books ON orders.book_id = books.id
+  INNER JOIN users ON orders.user_id = users.id
+WHERE
+  orders.is_deleted = FALSE;
+```
+
+we must list the schema file of books and users after orders table in the configuration file.
+
+```yaml
+- schema: ["orders/schema.sql", "books/schema.sql", "users/schema.sql"]
+  queries: "orders/query.sql"
+  ...
+```
+
+Otherwise, sqlc will complain
+
+```text
+orders/query.sql:1:1: relation "books" does not exist
+orders/query.sql:45:1: relation "users" does not exist
+```
+
+Another example is the `revenues.sql` schema. This table is a materialized view
+
+```sql
+CREATE MATERIALIZED VIEW IF NOT EXISTS by_book_revenues AS
+  SELECT
+    books.id,
+    books.name,
+    books.category,
+    books.price,
+    books.created_at,
+    sum(orders.price) AS total,
+    sum(
+      CASE WHEN
+        (orders.created_at > now() - interval '30 day')
+      THEN orders.price ELSE 0 END
+    ) AS last30d
+  FROM
+    books
+    LEFT JOIN orders ON books.id = orders.book_id
+  GROUP BY
+      books.id;
+```
+
+Because this table is depending on both orders and books, in the schema file we must list them after
+the revenue table.
+
+```yaml
+- schema: ["revenues/schema.sql", "orders/schema.sql", "books/schema.sql"]
+```
+
+Lastly, each schema file will be saved into a string named `Schema`, defined in the `models.go`.
+They are made there to be convient for you to setup DB for unit tests.
+It is a good practice to always include the `IF NOT EXISTS` clause when creating tables and indexes.
 
 ### Query
 
-## WPgx
+For each query, we will
 
-### Testsuite
+#### Cache and invalidate
 
-## DCache
+#### Bulk insert
 
-## Naming conventions
-In short, for table and column names, always use 'snake_case'. 
-More details: [Naming Conventions](https://www.geeksforgeeks.org/postgresql-naming-conventions/) 
+#### Refresh materialized view
+
+### SQL Naming conventions
+
+In short, for table and column names, always use 'snake_case'.
+More details: [Naming Conventions](https://www.geeksforgeeks.org/postgresql-naming-conventions/)
 
 Indexes should be named in the following way:
-```
+
+```text
 {tablename}_{columnname(s)}_{suffix}
 ```
+
 where the suffix is one of the following:
-* ``pkey`` for a Primary Key constraint;
-* ``key`` for a Unique constraint;
-* ``excl`` for an Exclusion constraint;
-* ``idx`` for any other kind of index;
-* ``fkey`` for a Foreign key;
-* ``check`` for a Check constraint;
+
++ ``pkey`` for a Primary Key constraint;
++ ``key`` for a Unique constraint;
++ ``excl`` for an Exclusion constraint;
++ ``idx`` for any other kind of index;
++ ``fkey`` for a Foreign key;
++ ``check`` for a Check constraint;
 
 If the name is too long, (max length is 63), try to use shorter names for columnnames.
 
 Table Partitions should be named as
-```
+
+```text
 {{tablename}}_{{partition_name}}
 ```
-where the partition name should represent how the is the the table being partitioned.
+
+where the partition name should represent how the table is partitioned.
 For example:
-```
+
+```sql
 CREATE TABLE measurement (
     city_id         int not null,
     logdate         date not null,
@@ -158,3 +335,9 @@ CREATE TABLE measurement (
 CREATE TABLE measurement_y2006m02 PARTITION OF measurement
     FOR VALUES FROM ('2006-02-01') TO ('2006-03-01');
 ```
+
+## WPgx
+
+### Testsuite
+
+## DCache
