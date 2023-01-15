@@ -1,5 +1,5 @@
 # Guide to this wicked fork
-This is a wicked fork of sqlc. Please see the guide [here](guide.md).
+This is a wicked fork of sqlc. Please see the guide [here](GUIDE.md).
 
 # sqlc: A SQL Compiler
 
