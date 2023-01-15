@@ -348,13 +348,13 @@ func buildQueryInvalidates(queries []Query) error {
 	}
 
 	for i := range queries {
-		q := &queries[i]
+		mutation := &queries[i]
 		numMethodNameUsed := make(map[string]int)
-		for _, toInvalidateName := range q.Option.Invalidates {
+		for _, toInvalidateName := range mutation.Option.Invalidates {
 			query := qmap[toInvalidateName]
 			if query.Option.Cache <= 0 {
 				return fmt.Errorf("%s tries to invalidate %s, which is not cached",
-					q.MethodName, toInvalidateName)
+					mutation.MethodName, toInvalidateName)
 			}
 			methodName := sdk.LowerTitle(query.MethodName)
 			argName := methodName
@@ -362,15 +362,15 @@ func buildQueryInvalidates(queries []Query) error {
 				argName = fmt.Sprintf("%s%d", argName, numMethodNameUsed[methodName])
 			}
 			cacheKey := genCacheKeyWithArgName(query.Pkg, *query, argName, true)
-			if q.Arg.isEmpty() {
-				q.Invalidates = append(q.Invalidates, InvalidateParam{
+			if query.Arg.isEmpty() {
+				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
 					Q:        query,
 					NoArg:    true,
 					CacheKey: cacheKey,
 				})
 			} else {
 				numMethodNameUsed[methodName] += 1
-				q.Invalidates = append(q.Invalidates, InvalidateParam{
+				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
 					Q:        query,
 					ArgName:  argName,
 					CacheKey: cacheKey,

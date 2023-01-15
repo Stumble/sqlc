@@ -73,15 +73,19 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
     _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
+        {{ if not .NoArg -}}
         if {{.ArgName}} != nil {
+        {{ end -}}
             key := {{.CacheKey}}
             err = q.cache.Invalidate(ctx, key)
             if err != nil {
-                log.Err(err).Msgf(
+                log.Error().Err(err).Msgf(
                     "Failed to invalidate: %s", key)
                 anyErr = err
             }
+        {{ if not .NoArg -}}
         }
+        {{ end -}}
         {{ end -}}
         return anyErr
     })
@@ -148,15 +152,19 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
     _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
+        {{ if not .NoArg -}}
         if {{.ArgName}} != nil {
+        {{ end -}}
             key := {{.CacheKey}}
             err = q.cache.Invalidate(ctx, key)
             if err != nil {
-                log.Err(err).Msgf(
+                log.Error().Err(err).Msgf(
                     "Failed to invalidate: %s", key)
                 anyErr = err
             }
+        {{ if not .NoArg -}}
         }
+        {{ end -}}
         {{ end -}}
         return anyErr
     })
@@ -178,15 +186,19 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
     _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
+        {{ if not .NoArg -}}
         if {{.ArgName}} != nil {
+        {{ end -}}
             key := {{.CacheKey}}
             err = q.cache.Invalidate(ctx, key)
             if err != nil {
-                log.Err(err).Msgf(
+                log.Error().Err(err).Msgf(
                     "Failed to invalidate: %s", key)
                 anyErr = err
             }
+        {{ if not .NoArg -}}
         }
+        {{ end -}}
         {{ end -}}
         return anyErr
     })
@@ -208,15 +220,19 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
     _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
+        {{ if not .NoArg -}}
         if {{.ArgName}} != nil {
+        {{ end -}}
             key := {{.CacheKey}}
             err = q.cache.Invalidate(ctx, key)
             if err != nil {
-                log.Err(err).Msgf(
+                log.Error().Err(err).Msgf(
                     "Failed to invalidate: %s", key)
                 anyErr = err
             }
+        {{ if not .NoArg -}}
         }
+        {{ end -}}
         {{ end -}}
         return anyErr
     })
@@ -238,15 +254,19 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
     _ = q.db.PostExec(func() error {
         var anyErr error
         {{ range .Invalidates -}}
+        {{ if not .NoArg -}}
         if {{.ArgName}} != nil {
+        {{ end -}}
             key := {{.CacheKey}}
             err = q.cache.Invalidate(ctx, key)
             if err != nil {
-                log.Err(err).Msgf(
+                log.Error().Err(err).Msgf(
                     "Failed to invalidate: %s", key)
                 anyErr = err
             }
+        {{ if not .NoArg -}}
         }
+        {{ end -}}
         {{ end -}}
         return anyErr
     })
