@@ -285,12 +285,13 @@ Also, it is a good practice to always include the `IF NOT EXISTS` clause when cr
 ### Query
 
 `query.sql` file is where your define all the possible ways to access to the table. Each table
-must have 1 query file. 
-Queries can access all the table columns as long as they are listed in the schema section in 
-the configuration. We have seen an example that does that: `GetOrderByID`.
+must have 1 query file.
+Queries can access all the table columns as long as they are listed in the schema section in
+the configuration. We have seen an example, `GetOrderByID`, where the query joins other tables.
 
 Here is an example of listing all books of a category, with using id
 as the cursor for pagination.
+
 ```sql
 -- name: ListByCategory :many
 SELECT *
@@ -303,25 +304,103 @@ ORDER BY
 LIMIT @first;
 ```
 
-This forked version add two ability
+Best practices:
 
++ Use `@arg_name` to explictly name all the arguments for the query.
++ Use `::type` postgreSQL type conversion to hint sqlc for arguments that their types are hard or
+  impossible to be inferred.
 
+This wicked forked sqlc add two abilities to query: cache and invalidate.
+Both of them are added by extending sqlc to allow passing addition options for each query.
+Originally, you can only specify name and the type of result in the comments before SQL.
 
-#### Cache and invalidate
+The new feature allows yout to pass any options to codegen backend by adding comments starts with `-- --`.
+
+For example, this will generate code that caches the result of all books for 10 minutes.
+
+```sql
+-- name: GetAllBooks :many
+-- -- cache : 10m
+SELECT * FROM books;
+```
+
+Btw, this syntax looks very similar as passing arguments to the underlying script in npm.
+
+```bash
+npm run server -- --port=8080 // invokes `run server script with --port=8080`
+```
+
+#### Cache
+
+Cache accepts a [Go time.Duration format](https://pkg.go.dev/maze.io/x/duration#ParseDuration) as the
+only argument, which specify how long the result will be cached, if a cache is configured
+in the queries struct. If no cache is injected, caching is not possible and duration will be ignored.
+
+The best practise is to cache frequently queried objects
+
+// accurate cache for one result cache
+// less cache time for array result cache
+
+#### Invalidate
+
+When we mutate the state of table, we should proactively invalidate some cache values.
 
 #### Case study
 
 ##### Bulk insert and upsert
 
-If it is ensured that the data will not violate any constraints, you can use copy.
+If data will not violate any constraints, you can just use copyfrom.
 When a constraint fails, an error is throw, and none of data are copied (it is rolled back).
 
-But If you want to implement buld upsert, a workaround is:
+```sql
+-- name: BulkInsert :copyfrom
+INSERT INTO books (
+   name, description, metadata, category, price
+) VALUES (
+  $1, $2, $3, $4, $5
+);
+```
+
+But If you want to implement buld upsert, a workaround is to use `unnest` function to pass each
+column as an array. For example, the following query will generate a bulk upsert method.
+
+```sql
+-- name: UpsertUsers :exec
+insert into users
+  (name, metadata, image)
+select
+        unnest(@name::VARCHAR(255)[]),
+        unnest(@metadata::JSON[]),
+        unnest(@image::TEXT[])
+on conflict ON CONSTRAINT users_lower_name_key do
+update set
+    metadata = excluded.metadata,
+    image = excluded.image;
+```
+
+The generated Go code will look like:
+
+```go
+type UpsertUsersParams struct {
+  Name     []string
+  Metadata [][]byte
+  Image    []string
+}
+
+func (q *Queries) UpsertUsers(ctx context.Context, arg UpsertUsersParams) error {
+  _, err := q.db.WExec(ctx, "UpsertUsers", upsertUsers,
+    arg.Name, arg.Metadata, arg.Image)
+  // ...
+}
+```
 
 ##### Refresh materialized view
 
-Refresh statement is supported, so you can just do
+Refresh statement is supported, you can just list it as a query.
+
 ```sql
+-- name: Refresh :exec
+REFRESH MATERIALIZED VIEW CONCURRENTLY by_book_revenues;
 ```
 
 ### SQL Naming conventions
