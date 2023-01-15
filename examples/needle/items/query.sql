@@ -8,6 +8,10 @@ WHERE id = $1 LIMIT 1;
 SELECT * FROM Items
 WHERE Name LIKE $1;
 
+-- name: ListAllItems :many
+-- -- cache : 30m
+SELECT * FROM Items;
+
 -- name: ListItems :many
 SELECT * FROM Items
 WHERE id > @after
@@ -27,7 +31,7 @@ INSERT INTO Items (
 RETURNING *;
 
 -- name: DeleteItem :exec
--- -- invalidate : [GetItemByID, SearchItems]
+-- -- invalidate : [GetItemByID, SearchItems, ListAllItems]
 DELETE FROM Items
 WHERE id = $1;
 
