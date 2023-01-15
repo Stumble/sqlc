@@ -27,7 +27,7 @@ Instead, by adopting to this restricted form, we hope to:
 + Make it extremely easy to see all possible ways to query DB. By explicitly listing all of them
   in the query.sql file, DBAs can examinate query patterns and design indexes wisely. In the future,
   we might even be able to find out possible slow queries in compile time.
-+ Force you think twice before creating a new query. Some bussiness logics can share the same
++ Force you to think twice before creating a new query. Some bussiness logics can share the same
   query, which means higher cache hit ratio. Sometimes when there are multiple ways to implement a
   usecase, choose the one that can reuse existing indexes.
 
@@ -215,7 +215,6 @@ If we add a query that joins books and users with the order table, for example,
 
 ```sql
 -- name: GetOrderByID :one
--- -- cache : 10m
 SELECT
   orders.ID,
   orders.user_id,
@@ -249,7 +248,7 @@ orders/query.sql:1:1: relation "books" does not exist
 orders/query.sql:45:1: relation "users" does not exist
 ```
 
-Another example is the `revenues.sql` schema. This table is a materialized view
+Another example is the `revenues` table schema. It is a materialized view
 
 ```sql
 CREATE MATERIALIZED VIEW IF NOT EXISTS by_book_revenues AS
@@ -280,18 +279,50 @@ the revenue table.
 ```
 
 Lastly, each schema file will be saved into a string named `Schema`, defined in the `models.go`.
-They are made there to be convient for you to setup DB for unit tests.
-It is a good practice to always include the `IF NOT EXISTS` clause when creating tables and indexes.
+They are made there to be convenient for you to setup DB for unit tests.
+Also, it is a good practice to always include the `IF NOT EXISTS` clause when creating tables and indexes.
 
 ### Query
 
-For each query, we will
+`query.sql` file is where your define all the possible ways to access to the table. Each table
+must have 1 query file. 
+Queries can access all the table columns as long as they are listed in the schema section in 
+the configuration. We have seen an example that does that: `GetOrderByID`.
+
+Here is an example of listing all books of a category, with using id
+as the cursor for pagination.
+```sql
+-- name: ListByCategory :many
+SELECT *
+FROM
+  books
+WHERE
+  category = @category AND id > @after
+ORDER BY
+  id
+LIMIT @first;
+```
+
+This forked version add two ability
+
+
 
 #### Cache and invalidate
 
-#### Bulk insert
+#### Case study
 
-#### Refresh materialized view
+##### Bulk insert and upsert
+
+If it is ensured that the data will not violate any constraints, you can use copy.
+When a constraint fails, an error is throw, and none of data are copied (it is rolled back).
+
+But If you want to implement buld upsert, a workaround is:
+
+##### Refresh materialized view
+
+Refresh statement is supported, so you can just do
+```sql
+```
 
 ### SQL Naming conventions
 
@@ -313,7 +344,7 @@ where the suffix is one of the following:
 + ``fkey`` for a Foreign key;
 + ``check`` for a Check constraint;
 
-If the name is too long, (max length is 63), try to use shorter names for columnnames.
+If the name is too long, (max length is 63), try to use shorter names for column names.
 
 Table Partitions should be named as
 
@@ -336,8 +367,18 @@ CREATE TABLE measurement_y2006m02 PARTITION OF measurement
     FOR VALUES FROM ('2006-02-01') TO ('2006-03-01');
 ```
 
+## DCache
+
+[DCache](https://github.com/Stumble/dcache) is the core of protecting the database.
+
 ## WPgx
 
-### Testsuite
+[WPgx](https://github.com/Stumble/wpgx) stands for 'wrapped-Pgx'. It simply wraps the common
+query and execute functions of pgx driver to add telemetry abilities and support cache invalidation
+upon the transaction is successfully committed.
 
-## DCache
+The code of wpgx is very simple, the best way to understand it is to read its source codes.
+
+### Transaction
+
+### Testsuite
