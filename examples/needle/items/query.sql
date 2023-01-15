@@ -31,6 +31,11 @@ RETURNING *;
 DELETE FROM Items
 WHERE id = $1;
 
+-- name: DeleteTwoItem :exec
+-- -- invalidate : [GetItemByID, GetItemByID]
+DELETE FROM Items
+WHERE id = $1 OR id = $2;
+
 -- name: UpdateQRCode :execrows
 -- -- invalidate : [GetItemByID]
 UPDATE Items
