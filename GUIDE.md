@@ -286,7 +286,7 @@ Also, it is a good practice to always include the `IF NOT EXISTS` clause when cr
 
 `query.sql` file is where your define all the possible ways to access to the table. Each table
 must have 1 query file.
-Queries can access all the table columns as long as they are listed in the schema section in
+Queries can access all the table columns as long as their tables are listed in the schema section in
 the configuration. We have seen an example, `GetOrderByID`, where the query joins other tables.
 
 Here is an example of listing all books of a category, with using id
@@ -310,10 +310,10 @@ Best practices:
 + Use `::type` postgreSQL type conversion to hint sqlc for arguments that their types are hard or
   impossible to be inferred.
 
-This wicked forked sqlc add two abilities to query: cache and invalidate.
-Both of them are added by extending sqlc to allow passing addition options for each query.
-Originally, you can only specify name and the type of result in the comments before SQL.
+This wicked forked sqlc adds two abilities to query: cache and invalidate.
 
+Both of them are added by extending sqlc to allow passing additional options per each query.
+Originally, you can only specify name and the type of result in the comments before SQL.
 The new feature allows yout to pass any options to codegen backend by adding comments starts with `-- --`.
 
 For example, this will generate code that caches the result of all books for 10 minutes.
