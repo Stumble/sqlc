@@ -310,6 +310,11 @@ Best practices:
 + Use `::type` postgreSQL type conversion to hint sqlc for arguments that their types are hard or
   impossible to be inferred.
 
+Known issues:
+
++ `from unnest(array1, arry2)` is not supported yet. Use `select unnest(array1), unnest(array1)` instead.
+  Note, when the arrays are not all the same length then the shorter ones are padded with NULLs.
+
 This wicked forked sqlc adds two abilities to query: cache and invalidate.
 
 Both of them are added by extending sqlc to allow passing additional options per each query.
@@ -361,7 +366,7 @@ INSERT INTO books (
 );
 ```
 
-But If you want to implement buld upsert, a workaround is to use `unnest` function to pass each
+But If you want to implement bulk upsert, the best practice is to use `unnest` function to pass each
 column as an array. For example, the following query will generate a bulk upsert method.
 
 ```sql
@@ -392,6 +397,45 @@ func (q *Queries) UpsertUsers(ctx context.Context, arg UpsertUsersParams) error 
     arg.Name, arg.Metadata, arg.Image)
   // ...
 }
+```
+
+##### Other bulk operations
+
+When you have too many parameters in a query, it can become slow.
+To operate on data in bulk, it is a good practice to use `select UNNEST(@array_arg)...` to build
+an intermediate table, and then use that table.
+
+For example, to select based on different conditions, you can:
+
+```sql
+-- name: ListOrdersByUserAndBook :many
+SELECT * FROM orders
+WHERE
+  (user_id, book_id) IN (
+  SELECT
+    UNNEST(@user_id::int[]),
+    UNNEST(@book_id::int[])
+);
+```
+
+
+To update different rows to different values, you can:
+
+```sql
+-- name: BulkUpdate :exec
+UPDATE orders
+SET
+  price=temp.price,
+  book_id=temp.book_id
+FROM
+  (
+    SELECT
+      UNNEST(@id::int[]) as id,
+      UNNEST(@price::bigint[]) as price,
+      UNNEST(@book_id::int[]) as book_id
+  ) AS temp
+WHERE
+  orders.id=temp.id;
 ```
 
 ##### Refresh materialized view
