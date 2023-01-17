@@ -53,3 +53,11 @@ sql:
       sql_package: "wpgx"
       package: "vitems"
       out: "vitems"
+- schema: "bestsellers/schema.sql"
+  queries: "bestsellers/query.sql"
+  engine: "postgresql"
+  gen:
+    go:
+      sql_package: "wpgx"
+      package: "bestsellers"
+      out: "bestsellers"
