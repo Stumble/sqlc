@@ -418,7 +418,6 @@ WHERE
 );
 ```
 
-
 To update different rows to different values, you can:
 
 ```sql
@@ -488,6 +487,100 @@ CREATE TABLE measurement (
 
 CREATE TABLE measurement_y2006m02 PARTITION OF measurement
     FOR VALUES FROM ('2006-02-01') TO ('2006-03-01');
+```
+
+#### Work with legacy project and CamelCase-style names
+
+If you are working with a legacy codebase that its DB does not follow the above
+naming convention, for example, used CamelCase style for column names, there are
+some caveats you must pay attention to.
+
+First, please note that, in PostgreSQL, identifiers (including column names) that are **not double-quoted** are folded to lowercase, while
+column names that were created with double-quotes and thereby retained uppercase letters
+(and/or other syntax violations) have to be double-quoted for the rest of their life.
+
+Here's an example.
+
+```sql
+CREATE TABLE IF NOT EXISTS test (
+   id           INT       GENERATED ALWAYS AS IDENTITY,
+   CamelCase    INT,
+   snake_case   INT,
+   CONSTRAINT test_id_pkey PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS test2 (
+   id            INT       GENERATED ALWAYS AS IDENTITY,
+   "CamelCase"   INT,
+   snake_case    INT,
+   CONSTRAINT test2_id_pkey PRIMARY KEY (id)
+);
+```
+
+The column `CamelCase` in table `test` were not created with double-quotes, so internally, the name
+was actually stored in the lower-cased string. But `test2.CamelCase` did, so the name is stored in its
+original camcal-case style. See below logs from psql.
+
+```psql
+# \d test
+                            Table "public.test"
+   Column   |  Type   | Collation | Nullable |           Default
+------------+---------+-----------+----------+------------------------------
+ id         | integer |           | not null | generated always as identity
+ camelcase  | integer |           |          |
+ snake_case | integer |           |          |
+
+# \d test2
+                            Table "public.test2"
+   Column   |  Type   | Collation | Nullable |           Default
+------------+---------+-----------+----------+------------------------------
+ id         | integer |           | not null | generated always as identity
+ CamelCase  | integer |           |          |
+ snake_case | integer |           |          |
+```
+
+Differences of accessing these two tables:
+
+```sql
+-- This is okay!, all identifiers will be lowered-cased if not quoted.
+insert into test (
+  CaMelCASe, snake_case)
+values (
+  1, 2);
+
+-- NOT okay!
+-- ERROR:  column "camelcase" of relation "test2" does not exist
+-- LINE 2:   CamelCase, snake_case)
+insert into test2 (
+  CamelCase, snake_case)
+values (
+  1, 2);
+
+-- The right way to work with table test2.
+insert into test2 (
+  "CamelCase", snake_case)
+values (
+  1, 2);
+
+-- Another example of quoting identifiers.
+select t2."CamelCase" from test2 as t2;
+```
+
+Unfortunately, sqlc can not check for errors if you forgot to quote identifiers correctly, for now.
+So you need to be very careful if the column names were actually stored in CamelCase.
+
+Second, if you want to preserve the CamelCase name in go, use rename in the `sqlc.yaml` configuration,
+for example,
+
+```yaml
+version: "2"
+overrides:
+  go:
+    rename:
+      createdat: "CreatedAt"
+      updatedat: "UpdatedAt"
+sql:
+  ....
 ```
 
 ## DCache
