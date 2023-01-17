@@ -67,8 +67,7 @@ type importer struct {
 func (i *importer) usesType(typ string) bool {
 	for _, strct := range i.Structs {
 		for _, f := range strct.Fields {
-			fType := strings.TrimPrefix(f.Type, "[]")
-			if strings.HasPrefix(fType, typ) {
+			if strings.HasPrefix(trimTypePrefix(f.Type), typ) {
 				return true
 			}
 		}
@@ -252,8 +251,7 @@ func (i *importer) interfaceImports() fileImports {
 				}
 			}
 			if !q.Arg.isEmpty() {
-				argType := strings.TrimPrefix(q.Arg.Type(), "[]")
-				if strings.HasPrefix(argType, name) {
+				if strings.HasPrefix(trimTypePrefix(q.Arg.Type()), name) {
 					return true
 				}
 			}
@@ -313,13 +311,13 @@ func (i *importer) queryImports(filename string) fileImports {
 			if q.hasRetType() {
 				if q.Ret.EmitStruct() {
 					for _, f := range q.Ret.Struct.Fields {
-						fType := strings.TrimPrefix(f.Type, "[]")
+						fType := trimTypePrefix(f.Type)
 						if strings.HasPrefix(fType, name) {
 							return true
 						}
 					}
 				}
-				retType := strings.TrimPrefix(q.Ret.Type(), "[]")
+				retType := trimTypePrefix(q.Ret.Type())
 				if strings.HasPrefix(retType, name) {
 					return true
 				}
@@ -327,13 +325,13 @@ func (i *importer) queryImports(filename string) fileImports {
 			if !q.Arg.isEmpty() {
 				if q.Arg.EmitStruct() {
 					for _, f := range q.Arg.Struct.Fields {
-						fType := strings.TrimPrefix(f.Type, "[]")
+						fType := trimTypePrefix(f.Type)
 						if strings.HasPrefix(fType, name) {
 							return true
 						}
 					}
 				}
-				argType := strings.TrimPrefix(q.Arg.Type(), "[]")
+				argType := trimTypePrefix(q.Arg.Type())
 				if strings.HasPrefix(argType, name) {
 					return true
 				}
@@ -433,13 +431,13 @@ func (i *importer) batchImports() fileImports {
 			if q.hasRetType() {
 				if q.Ret.EmitStruct() {
 					for _, f := range q.Ret.Struct.Fields {
-						fType := strings.TrimPrefix(f.Type, "[]")
+						fType := trimTypePrefix(f.Type)
 						if strings.HasPrefix(fType, name) {
 							return true
 						}
 					}
 				}
-				retType := strings.TrimPrefix(q.Ret.Type(), "[]")
+				retType := trimTypePrefix(q.Ret.Type())
 				if strings.HasPrefix(retType, name) {
 					return true
 				}
@@ -447,13 +445,13 @@ func (i *importer) batchImports() fileImports {
 			if !q.Arg.isEmpty() {
 				if q.Arg.EmitStruct() {
 					for _, f := range q.Arg.Struct.Fields {
-						fType := strings.TrimPrefix(f.Type, "[]")
+						fType := trimTypePrefix(f.Type)
 						if strings.HasPrefix(fType, name) {
 							return true
 						}
 					}
 				}
-				argType := strings.TrimPrefix(q.Arg.Type(), "[]")
+				argType := trimTypePrefix(q.Arg.Type())
 				if strings.HasPrefix(argType, name) {
 					return true
 				}
@@ -475,4 +473,12 @@ func (i *importer) batchImports() fileImports {
 	}
 
 	return sortedImports(std, pkg)
+}
+
+// trimTypePrefix removes:
+// *T => T
+// []T => T
+// []*T => T
+func trimTypePrefix(t string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(t, "[]"), "*")
 }
