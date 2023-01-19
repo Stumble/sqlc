@@ -1,6 +1,6 @@
 # Intro
 
-Here we present a combo of using `wicked-sqlc + wpgx + dcache` that can:
+Here we present a combo of using `wicked-sqlc + wpgx + cache` that can:
 
 + Generate fully type-safe idiomatic Go code with built-in
   + memory-redis cache layer with compression and singleflight protection.
@@ -18,27 +18,27 @@ as this combo.
 
 # Sqlc (this wicked fork)
 
-Although using sqlc might increase the productivities, as you no longer need to manually write the
+Although using sqlc might increase the productivity, as you no longer need to manually write the
 boilerplate codes while having cache and telemetries out of the box,
 it is **NOT** our goal.
 
 Instead, by adopting to this restricted form, we hope to:
 
 + Make it extremely easy to see all possible ways to query DB. By explicitly listing all of them
-  in the query.sql file, DBAs can examinate query patterns and design indexes wisely. In the future,
+  in the query.sql file, DBAs can examine query patterns and design indexes wisely. In the future,
   we might even be able to find out possible slow queries in compile time.
-+ Force you to think twice before creating a new query. Some bussiness logics can share the same
++ Force you to think twice before creating a new query. Some business logics can share the same
   query, which means higher cache hit ratio. Sometimes when there are multiple ways to implement a
   usecase, choose the one that can reuse existing indexes.
 
-Sometimes, you might find sqlc too *restrited*, and cannot hold the eager to
+Sometimes, you might find sqlc too *restricted*, and cannot hold the eager to
 write a function that builds the
 SQL dynamically based on conditions, **don't**  do it, unless it is a must, which is hardly true.
 In the end of the day, the so-called backend development is more or less about
 building a data-intensive software, where the most common bottleneck, is that fragile database,
 which is very costly to scale.
 
-From another perspective, the time will either be spent on (1) later, when the bussiness grew and
+From another perspective, the time will either be spent on (1) later, when the business grew and
 the bottleneck was reached, diagnosing the problem and refactoring your database codes, while
 your customers are disappointed, or (2) before the product is launched, writing queries.
 
@@ -60,7 +60,7 @@ general ideas of how to use sqlc. In the following example, we will pay more
 attention to things that are different to official sqlc.
 
 In this tutorial, we will build a online bookstore, with unit tests, to demonstrate how to use this combo.
-The project can be found here: [bookstroe](https://github.com/Stumble/bookstore).
+The project can be found here: [bookstore](https://github.com/Stumble/bookstore).
 
 ### Project structure
 
@@ -98,7 +98,7 @@ sql:
 It configures sqlc to generate Go code for `books` table based on the schema and queries SQL file,
 under `books/` directory, relatively to `sqlc.yaml` file.
 The only thing different from the official sqlc is the `sql_package` option. This wicked fork will
-use `wpgx` packge as the SQL driver, so you have to set `sql_packge` to this value.
+use `wpgx` package as the SQL driver, so you have to set `sql_package` to this value.
 
 ### Schema
 
@@ -110,7 +110,7 @@ each **logical** table in DB. To be more clear:
   be placed into one schema file, as they are logically one table.
 + For **(Materialized) View**, one schema file per view is required.
 
-You can and you should list all the **constrants and indexes** in the schema file. In the future,
+You can and you should list all the **constraints and indexes** in the schema file. In the future,
 we might have some static analyze tool to check for slow queries. Also, listing them here will
 make code viewers' lives much easier.
 
@@ -306,7 +306,11 @@ LIMIT @first;
 
 Best practices:
 
-+ Use `@arg_name` to explictly name all the arguments for the query.
++ Use `@arg_name` to explicitly name all the arguments for the query. If somehow not working, try to use
+  `sqlc.arg()`, or `sqlc.narg()` if appropriate.
+  It is highly recommended to read [this doc](https://docs.sqlc.dev/en/latest/howto/named_parameters.html).
++ DO NOT mix `$`, `@` and `sqlc.arg()/sqlc.narg()` in one SQL query. Each query should purely use one kind
+  of parameter style.
 + Use `::type` postgreSQL type conversion to hint sqlc for arguments that their types are hard or
   impossible to be inferred.
 
@@ -314,12 +318,17 @@ Known issues:
 
 + `from unnest(array1, arry2)` is not supported yet. Use `select unnest(array1), unnest(array1)` instead.
   Note, when the arrays are not all the same length then the shorter ones are padded with NULLs.
++ In some cases, you must put a space before the "@" symbol for named parameter,
+  For example, a statement like `select ... where a=@a`
+  cannot be correctly parsed by sqlc. You must change it to `select ... a = @a`.
+  You shall notice this type of error after code generation, as you will see that some parameters are
+  missing in the generated code and an incorrect SQL is used for query (still including @).
 
 This wicked forked sqlc adds two abilities to query: cache and invalidate.
 
 Both of them are added by extending sqlc to allow passing additional options per each query.
 Originally, you can only specify name and the type of result in the comments before SQL.
-The new feature allows yout to pass any options to codegen backend by adding comments starts with `-- --`.
+The new feature allows you to pass any options to codegen backend by adding comments starts with `-- --`.
 
 For example, this will generate code that caches the result of all books for 10 minutes.
 
@@ -341,7 +350,7 @@ Cache accepts a [Go time.Duration format](https://pkg.go.dev/maze.io/x/duration#
 only argument, which specify how long the result will be cached, if a cache is configured
 in the queries struct. If no cache is injected, caching is not possible and duration will be ignored.
 
-The best practise is to cache frequently queried objects
+The best practice is to cache frequently queried objects
 
 // accurate cache for one result cache
 // less cache time for array result cache
@@ -435,6 +444,28 @@ FROM
   ) AS temp
 WHERE
   orders.id=temp.id;
+```
+
+##### Partial update
+
+If you wish to write one SQL update statement that only update some columns,
+based on the arguments at runtime,
+you can use the following trick that use `sqlc.narg` to generate nullable parameters and use
+`coalesce` function, so that a column is set to the new value, if not null, or unchanged.
+
+However, please note this trick CANNOT handle this case: when a column is nullable, you cannot set it
+to null, using this trick. Also, You MUST write some unit tests to check if the SQL would work as expected.
+
+```sql
+-- name: PartialUpdateByID :exec
+UPDATE books
+SET
+  description = coalesce(sqlc.narg('description'), description),
+  metadata = coalesce(sqlc.narg('meta'), metadata),
+  price = coalesce(sqlc.narg('price'), price),
+  updated_at = NOW()
+WHERE
+  id = sqlc.arg('id');
 ```
 
 ##### Refresh materialized view
