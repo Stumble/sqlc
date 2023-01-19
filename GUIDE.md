@@ -304,26 +304,6 @@ ORDER BY
 LIMIT @first;
 ```
 
-Best practices:
-
-+ Use `@arg_name` to explicitly name all the arguments for the query. If somehow not working, try to use
-  `sqlc.arg()`, or `sqlc.narg()` if appropriate.
-  It is highly recommended to read [this doc](https://docs.sqlc.dev/en/latest/howto/named_parameters.html).
-+ DO NOT mix `$`, `@` and `sqlc.arg()/sqlc.narg()` in one SQL query. Each query should purely use one kind
-  of parameter style.
-+ Use `::type` postgreSQL type conversion to hint sqlc for arguments that their types are hard or
-  impossible to be inferred.
-
-Known issues:
-
-+ `from unnest(array1, arry2)` is not supported yet. Use `select unnest(array1), unnest(array1)` instead.
-  Note, when the arrays are not all the same length then the shorter ones are padded with NULLs.
-+ In some cases, you must put a space before the "@" symbol for named parameter,
-  For example, a statement like `select ... where a=@a`
-  cannot be correctly parsed by sqlc. You must change it to `select ... a = @a`.
-  You shall notice this type of error after code generation, as you will see that some parameters are
-  missing in the generated code and an incorrect SQL is used for query (still including @).
-
 This wicked forked sqlc adds two abilities to query: cache and invalidate.
 
 Both of them are added by extending sqlc to allow passing additional options per each query.
@@ -350,14 +330,38 @@ Cache accepts a [Go time.Duration format](https://pkg.go.dev/maze.io/x/duration#
 only argument, which specify how long the result will be cached, if a cache is configured
 in the queries struct. If no cache is injected, caching is not possible and duration will be ignored.
 
-The best practice is to cache frequently queried objects
+The best practice is to cache frequently queried objects, especially
 
-// accurate cache for one result cache
-// less cache time for array result cache
++ cache results that we know how to invalidate for longer time, in most cases, they are result of single
+  rows. For example, a row of book information can be cached for a long time, because we know when the book
+  information will be updated so that we can apply invalidate accordingly.
++ cache results that we do not know how to invalidate for a shorter time. For example, a list of top seller
+  books, because it is hard for us to know if we should invalidate the cache of that list when we are updating
+  information of some books, (unless you do some fancy bloom-filter stuff..).
 
 #### Invalidate
 
 When we mutate the state of table, we should proactively invalidate some cache values.
+
+#### Best practices
+
++ Use `@arg_name` to explicitly name all the arguments for the query. If somehow not working, try to use
+  `sqlc.arg()`, or `sqlc.narg()` if appropriate.
+  It is highly recommended to read [this doc](https://docs.sqlc.dev/en/latest/howto/named_parameters.html).
++ DO NOT mix `$`, `@` and `sqlc.arg()/sqlc.narg()` in one SQL query. Each query should purely use one kind
+  of parameter style.
++ Use `::type` postgreSQL type conversion to hint sqlc for arguments that their types are hard or
+  impossible to be inferred.
+
+#### Known issues
+
++ `from unnest(array1, arry2)` is not supported yet. Use `select unnest(array1), unnest(array1)` instead.
+  Note, when the arrays are not all the same length then the shorter ones are padded with NULLs.
++ In some cases, you must put a space before the "@" symbol for named parameter,
+  For example, a statement like `select ... where a=@a`
+  cannot be correctly parsed by sqlc. You must change it to `select ... a = @a`.
+  You shall notice this type of error after code generation, as you will see that some parameters are
+  missing in the generated code and an incorrect SQL is used for query (still including @).
 
 #### Case study
 
