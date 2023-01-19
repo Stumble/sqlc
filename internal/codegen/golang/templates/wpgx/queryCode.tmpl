@@ -62,7 +62,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
     }
 
     var {{.Ret.Name}} *{{.Ret.Type}}
-    err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, {{.Ret.Name}}, dbRead, false, false)
+    err := q.cache.GetWithTtl(ctx, {{.CacheKey}}, &{{.Ret.Name}}, dbRead, false, false)
     if err != nil {
         return nil, err
     }
