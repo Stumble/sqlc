@@ -16,7 +16,6 @@ NOTE: this combo is for PostgreSQL, if you are using MySQL, you can checkout thi
 [Needle](https://github.com/Stumble/needle). It provides the same set of functionalities
 as this combo.
 
-
 # Sqlc (this wicked fork)
 
 Although using sqlc might increase the productivity, as you no longer need to manually write the
@@ -363,6 +362,9 @@ When we mutate the state of table, we should proactively invalidate some cache v
   cannot be correctly parsed by sqlc. You must change it to `select ... a = @a`.
   You shall notice this type of error after code generation, as you will see that some parameters are
   missing in the generated code and an incorrect SQL is used for query (still including @).
++ Enum type support is very limited. First, you cannot use copyfrom for when the column is
+  an enum type. Also, when using enum type in any clause, e.g., `enum_col = ANY(@xxx::enum_type[])`, it won't work. You have to do `enum_col = ANY(@xxx::text[]::enum_type[])`, and
+  unfortunately the parameters type will become string array, instead of exptected enum array.
 
 #### Case study
 
@@ -619,11 +621,11 @@ sql:
   ....
 ```
 
-## DCache
+# DCache
 
 [DCache](https://github.com/Stumble/dcache) is the core of protecting the database.
 
-## WPgx
+# WPgx
 
 [WPgx](https://github.com/Stumble/wpgx) stands for 'wrapped-Pgx'. It simply wraps the common
 query and execute functions of pgx driver to add prometheus and open telemetry tracer.
@@ -635,16 +637,111 @@ functions post execution.
 
 The code of wpgx is very simple, the best way to understand it is to read its source codes.
 
-### Telemetry
+## Telemetry
 
-#### Prometheus
+### Prometheus
 
 + {appName}_wpgx_conn_pool{name="max_conns/total_conns/...."}: connection pool gauges.
 + {appName}_wpgx_request_total{name="$queryName"}: number of DB hits for each query.
 + {appName}_wpgx_latency_milliseconds{name="$queryName"}: histogram of SQL execution duration.
 
-#### Open Telemetry
+### Open Telemetry
+
+TBD.
 
 ### Transaction
 
+TBD.
+
 ### Testsuite
+
+TBD.
+
+# Unit testing
+
+Most Unit tests follows this pattern:
+
+1. [x] Setup dependencies like DB, Redis and etc..
+2. [x] Load background data into DB.
+3. Run functions the test hopes to check.
+4. Verify output of the function is expected.
+5. [x] Verify DB state is expected.
+
+Steps with [x] mark indicates that we can use boilerplate function or code generated from
+the `sqlc + wpgx` combo.
+
+For example, to test a 'search book by names' usecase, the unit test may:
+
+1. Setup a *Wpgx.pool that connects to the DB instance and pass it to the usecase.
+2. Insert some book items into books table.
+3. Run the search usecase function.
+4. Expect the number of returned value to be N.
+5. Verify that books book has not been changed at all, but the search_activity table does
+   have a new entry.
+
+## Setup DB connection for the test
+
+PgxTestSuite is a Testify.testsuite with some helper functions for easy-writing (1), (2) and (5).
+
+First, your test suite needs to embed the WPgxTestSuite and initialize it with a wpgx.Config.
+Like the below example, you can directly use the configuration of envvar.
+
+One caveat: You must set POSTGRES_APPNAME envvar if you want to use the default
+NewWPgxTestSuiteFromEnv,
+because it is required. For example, you can do `export POSTGRES_APPNAME=xxxtests`.
+
+```go
+import (
+  "github.com/stumble/wpgx/testsuite"
+)
+
+type myTestSuite struct {
+  *testsuite.WPgxTestSuite
+}
+
+func newMyTestSuite() *myTestSuite {
+ return &myTestSuite{
+  WPgxTestSuite: testsuite.NewWPgxTestSuiteFromEnv("testDbName", []string{
+   `CREATE TABLE IF NOT EXISTS books (
+    // .....
+    );`,
+  }),
+ }
+}
+
+func TestMyTestSuite(t *testing.T) {
+ suite.Run(t, newMyTestSuite())
+}
+```
+
+## Loader and Dumper
+
+Note that testsuite defined two interfaces:
+
+```go
+type Loader interface {
+  Load(data []byte) error
+}
+type Dumper interface {
+  Dump() ([]byte, error)
+}
+```
+
+They are **table-scope** loader and dumper that can load/dump table from/to bytes.
+The wicked-fork sqlc will automatically generate load and dump functions for each table schema.
+
+## Testsuite helpers
+
+The testsuite provides these 3 helper functions:
+
+```go
+// load state into memory from file.
+func (suite *WPgxTestSuite) LoadState(filename string, loader Loader);
+// dump table state to file name via dumper.
+func (suite *WPgxTestSuite) DumpState(filename string, dumper Dumper);
+// dump table state via dumper to memory, and load testdata/xxx/yyy.${tableName}.golden
+// into memory and then compare these two.
+func (suite *WPgxTestSuite) Golden(tableName string, dumper Dumper);
+```
+
+### Setup background data from loader
