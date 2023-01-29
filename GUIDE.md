@@ -16,6 +16,7 @@ NOTE: this combo is for PostgreSQL, if you are using MySQL, you can checkout thi
 [Needle](https://github.com/Stumble/needle). It provides the same set of functionalities
 as this combo.
 
+
 # Sqlc (this wicked fork)
 
 Although using sqlc might increase the productivity, as you no longer need to manually write the
@@ -105,7 +106,7 @@ use `wpgx` package as the SQL driver, so you have to set `sql_package` to this v
 A schema file is 1-to-1 mapped to a logical table. That is, you need to write 1 schema file for
 each **logical** table in DB. To be more clear:
 
-+ 1 schema fiel for 1 normal physical table.
++ 1 schema file for 1 normal physical table.
 + For **Declarative Partitioning**, the table declaration and all its partitions can be, and should
   be placed into one schema file, as they are logically one table.
 + For **(Materialized) View**, one schema file per view is required.
@@ -625,10 +626,24 @@ sql:
 ## WPgx
 
 [WPgx](https://github.com/Stumble/wpgx) stands for 'wrapped-Pgx'. It simply wraps the common
-query and execute functions of pgx driver to add telemetry abilities and support cache invalidation
-upon the transaction is successfully committed.
+query and execute functions of pgx driver to add prometheus and open telemetry tracer.
+
+In addition to original pgx functions, we added a `PostExec(fn PostExecFunc)` to both
+normal connection type `WConn` and transaction type `WTx`. The `fn` will be executed after
+the 'transaction' is successfully committed. A common usecase is to run cache invalidation
+functions post execution.
 
 The code of wpgx is very simple, the best way to understand it is to read its source codes.
+
+### Telemetry
+
+#### Prometheus
+
++ {appName}_wpgx_conn_pool{name="max_conns/total_conns/...."}: connection pool gauges.
++ {appName}_wpgx_request_total{name="$queryName"}: number of DB hits for each query.
++ {appName}_wpgx_latency_milliseconds{name="$queryName"}: histogram of SQL execution duration.
+
+#### Open Telemetry
 
 ### Transaction
 
