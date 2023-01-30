@@ -676,7 +676,7 @@ For example, to test a 'search book by names' usecase, the unit test may:
 2. Insert some book items into books table.
 3. Run the search usecase function.
 4. Expect the number of returned value to be N.
-5. Verify that books book has not been changed at all, but the search_activity table does
+5. Verify that books table has not been changed at all, but the search_activity table does
    have a new entry.
 
 It is **highly recommended** to read [this example](https://github.com/Stumble/bookstore/blob/main/pkg/usecases/usecase_test.go), which is the example code that
@@ -687,8 +687,8 @@ The workflow usually is:
 
 1. Write tests.
 2. Run `go test -update` to automatically generate golden files.
-3. Eye-browsing golden files, make sure states are expected.
-4. Commit it and that's it.
+3. Verify that DB states in auto-generated golden files are expected.
+4. Commit it and run `go test` again and in the future.
 
 ## Setup DB connection for the test
 
@@ -727,6 +727,39 @@ func newMyTestSuite() *myTestSuite {
 func TestMyTestSuite(t *testing.T) {
  suite.Run(t, newMyTestSuite())
 }
+```
+
+Please also note that you **must** to override the `SetupTest()`, by calling the embedded
+one first, then initialize member variables of the testsuite.
+
+```go
+func (suite *usecaseTestSuite) SetupTest() {
+  suite.WPgxTestSuite.SetupTest()
+  // make sure all test targets are initialized after ^ function.
+  // because DB will be dropped and connections will be terminated.
+  suite.usecase = NewUsecase(suite.GetPool())
+}
+```
+
+For every test case, `SetupTest` will be automatically triggered at the beginning. But if you
+hope to run sub-tests under one test case function, you will need to manually call
+this function. This is a common pattern if you write table-based tests, for example,
+
+```go
+ for _, tc := range []struct {
+  tcName      string
+  input       string
+  expectedErr error
+ } {
+  {"case1", "a", nil},
+  {"case2", "b", nil},
+ } {
+  suite.Run(tc.tcName, func() {
+   suite.SetupTest()
+   //.... unit test logics
+  })
+ }
+
 ```
 
 ## Loader and Dumper
