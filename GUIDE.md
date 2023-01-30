@@ -661,13 +661,13 @@ TBD.
 
 Most Unit tests follows this pattern:
 
-1. Setup dependencies like DB, Redis and etc.. [X] 
-2. Load background data into DB. [X] 
+1. Setup dependencies like DB, Redis and etc.. [X]
+2. Load background data into DB. [X]
 3. Run functions the test hopes to check.
 4. Verify output of the function is expected.
-5. Verify DB state is expected. [X] 
+5. Verify DB state is expected. [X]
 
-Steps with [X] mark indicates that we can use boilerplate function or code generated from
+Steps with [X] mark indicate that we can use boilerplate function or code generated from
 the `sqlc + wpgx` combo.
 
 For example, to test a 'search book by names' usecase, the unit test may:
@@ -679,8 +679,16 @@ For example, to test a 'search book by names' usecase, the unit test may:
 5. Verify that books book has not been changed at all, but the search_activity table does
    have a new entry.
 
-[Here](https://github.com/Stumble/bookstore/blob/main/pkg/usecases/usecase_test.go) is the
-example code that leverages auto-generated code to test the above usecase.
+It is **highly recommended** to read [this example](https://github.com/Stumble/bookstore/blob/main/pkg/usecases/usecase_test.go), which is the example code that
+leverages auto-generated code to test the above usecase.
+
+The workflow usually is:
+(You may need to `export POSTGRES_APPNAME=xxxtests`).
+
+1. Write tests.
+2. Run `go test -update` to automatically generate golden files.
+3. Eye-browsing golden files, make sure states are expected.
+4. Commit it and that's it.
 
 ## Setup DB connection for the test
 
@@ -709,6 +717,9 @@ func newMyTestSuite() *myTestSuite {
    `CREATE TABLE IF NOT EXISTS books (
     // .....
     );`,
+    // add other create table / index / type SQL here, so that they will be
+    // executed before each test.
+    // If you are using sqlc-generated code, you can just add all the xxxrepo.Schema here.
   }),
  }
 }
@@ -720,7 +731,7 @@ func TestMyTestSuite(t *testing.T) {
 
 ## Loader and Dumper
 
-Note that testsuite defined two interfaces:
+The testsuite defined two interfaces:
 
 ```go
 type Loader interface {
@@ -733,6 +744,29 @@ type Dumper interface {
 
 They are **table-scope** loader and dumper that can load/dump table from/to bytes.
 The wicked-fork sqlc will automatically generate load and dump functions for each table schema.
+You just need to create a wrapper struct to implement these two interface.
+
+```go
+type booksTableSerde struct {
+  books *books.Queries
+}
+
+func (b booksTableSerde) Load(data []byte) error {
+  return b.books.Load(context.Background(), data)
+}
+
+func (b booksTableSerde) Dump() ([]byte, error) {
+  return b.books.Dump(context.Background(), func(m *books.Book) {
+   m.CreatedAt = time.Unix(0, 0)
+   m.UpdatedAt = time.Unix(0, 0)
+  })
+}
+```
+
+Usually, you would want to set some time-related or any other 'flying' values to a fixed
+value before dumping them, to avoid creating flaky tests. Like in this example, `CreatedAt` and
+`UpdateAt` are set by DB's `NOW()` function. Comparing these values are likely never going to
+result an equal.
 
 ## Testsuite helpers
 
@@ -741,14 +775,64 @@ The testsuite provides these 3 helper functions:
 ```go
 // load state into memory from file.
 func (suite *WPgxTestSuite) LoadState(filename string, loader Loader);
-// dump table state to file name via dumper.
+// dump table state to file name via dumper. Hardly directly used, mostly indirectly called
+// by Golden(..).
 func (suite *WPgxTestSuite) DumpState(filename string, dumper Dumper);
 // dump table state via dumper to memory, and load testdata/xxx/yyy.${tableName}.golden
 // into memory and then compare these two.
 func (suite *WPgxTestSuite) Golden(tableName string, dumper Dumper);
 ```
 
-### Setup background data from loader
+Example code snippets:
+
+```go
+  suite.Run(tc.tcName, func() {
+   suite.SetupTest()
+
+   // must init after the last SetupTest()
+   bookserde := booksTableSerde{books: suite.usecase.books}
+   // load state
+   suite.LoadState("TestUsecaseTestSuite/TestSearch.books.input.json", bookserde)
+
+   // run search
+   rst, err := suite.usecase.Search(context.Background(), tc.s)
+
+   // check return value
+   suite.Equal(tc.expectedErr, err)
+   suite.Equal(tc.n, rst)
+
+   // verify db state
+   suite.Golden("books_table", bookserde)
+   suite.Golden("activitives_table", activitiesTableSerde{
+    activities: suite.usecase.activities})
+  })
+```
+
+### LoadState
+
+You can use this function to populate table with data from a JSON file. Rows in the
+JSON file will be appended to the table.
+
+```go
+   // must init after the last SetupTest()
+   bookserde := booksTableSerde{books: suite.usecase.books}
+   // load state
+   suite.LoadState("TestUsecaseTestSuite/TestSearch.books.input.json", bookserde)
+```
+
+### Compare using Golden
+
+After you ran the logics you hope to test, you can use compare the DB state using Golden.
+For every table you hope to verify, you need to call one Golden function.
+
+For the first time, you can use `go test -update` to automatically generate the golden files.
+
+```go
+   // verify db state
+   suite.Golden("books_table", bookserde)
+   suite.Golden("activitives_table", activitiesTableSerde{
+    activities: suite.usecase.activities})
+```
 
 ## Known Issues
 
