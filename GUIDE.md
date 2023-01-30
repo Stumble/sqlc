@@ -661,13 +661,13 @@ TBD.
 
 Most Unit tests follows this pattern:
 
-1. [x] Setup dependencies like DB, Redis and etc..
-2. [x] Load background data into DB.
+1. Setup dependencies like DB, Redis and etc.. [X] 
+2. Load background data into DB. [X] 
 3. Run functions the test hopes to check.
 4. Verify output of the function is expected.
-5. [x] Verify DB state is expected.
+5. Verify DB state is expected. [X] 
 
-Steps with [x] mark indicates that we can use boilerplate function or code generated from
+Steps with [X] mark indicates that we can use boilerplate function or code generated from
 the `sqlc + wpgx` combo.
 
 For example, to test a 'search book by names' usecase, the unit test may:
