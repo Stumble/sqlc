@@ -390,9 +390,9 @@ column as an array. For example, the following query will generate a bulk upsert
 insert into users
   (name, metadata, image)
 select
-        unnest(@name::VARCHAR(255)[]),
-        unnest(@metadata::JSON[]),
-        unnest(@image::TEXT[])
+  unnest(@name::VARCHAR(255)[]),
+  unnest(@metadata::JSON[]),
+  unnest(@image::TEXT[])
 on conflict ON CONSTRAINT users_lower_name_key do
 update set
     metadata = excluded.metadata,
@@ -790,8 +790,8 @@ func (b booksTableSerde) Load(data []byte) error {
 
 func (b booksTableSerde) Dump() ([]byte, error) {
   return b.books.Dump(context.Background(), func(m *books.Book) {
-   m.CreatedAt = time.Unix(0, 0)
-   m.UpdatedAt = time.Unix(0, 0)
+   m.CreatedAt = time.Unix(0, 0).UTC()
+   m.UpdatedAt = time.Unix(0, 0).UTC()
   })
 }
 ```
@@ -820,10 +820,12 @@ Example code snippets:
 
 ```go
   suite.Run(tc.tcName, func() {
+   // for sub-tests, must manually rerun SetupTest().
    suite.SetupTest()
 
    // must init after the last SetupTest()
    bookserde := booksTableSerde{books: suite.usecase.books}
+
    // load state
    suite.LoadState("TestUsecaseTestSuite/TestSearch.books.input.json", bookserde)
 
