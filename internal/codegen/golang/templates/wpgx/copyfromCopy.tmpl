@@ -38,7 +38,7 @@ func (r iteratorFor{{.MethodName}}) Err() error {
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.SlicePair}}) (int64, error) {
-	return q.db.WCopyFrom(ctx, "{{.MethodName}}", {{.TableIdentifier}}, {{.Arg.ColumnNames}}, &iteratorFor{{.MethodName}}{rows: {{.Arg.Name}}})
+	return q.db.WCopyFrom(ctx, "{{.UniqueLabel}}", {{.TableIdentifier}}, {{.Arg.ColumnNames}}, &iteratorFor{{.MethodName}}{rows: {{.Arg.Name}}})
 }
 
 {{end}}

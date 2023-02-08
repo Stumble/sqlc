@@ -273,11 +273,16 @@ func (q Query) InvalidateArgs() string {
 	return rv
 }
 
+// UniqueLabel is used by WPgx only.
+func (q Query) UniqueLabel() string {
+	return fmt.Sprintf("%s.%s", q.Pkg, q.MethodName)
+}
+
 func genCacheKeyWithArgName(pkg string, q Query, argName string, isPointer bool) string {
 	if len(pkg) == 0 {
 		panic("empty pkg name is invalid")
 	}
-	prefix := pkg + ":" + q.MethodName;
+	prefix := pkg + ":" + q.MethodName
 	if q.Arg.isEmpty() {
 		return `"` + prefix + `"`
 	}
