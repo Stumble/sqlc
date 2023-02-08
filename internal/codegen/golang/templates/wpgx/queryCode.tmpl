@@ -37,7 +37,7 @@ type {{.Ret.Type}} struct { {{- range .Ret.Struct.Fields}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
 {{- if eq .Option.Cache.Milliseconds 0}}
-    row := q.db.WQueryRow(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    row := q.db.WQueryRow(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
     err := row.Scan({{.Ret.Scan}})
     if err == pgx.ErrNoRows {
@@ -48,7 +48,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{else}}
     dbRead := func() (any, time.Duration, error) {
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
-        row := q.db.WQueryRow(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+        row := q.db.WQueryRow(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
         var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
         err := row.Scan({{.Ret.Scan}})
         if err == pgx.ErrNoRows {
@@ -99,7 +99,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.Type}}, error) {
 {{- if eq .Option.Cache.Milliseconds 0}}
-    rows, err := q.db.WQuery(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    rows, err := q.db.WQuery(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return nil, err
     }
@@ -118,7 +118,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{else}}
     dbRead := func() (any, time.Duration, error) {
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
-        rows, err := q.db.WQuery(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+        rows, err := q.db.WQuery(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
         if err != nil {
             return nil, 0, err
         }
@@ -177,7 +177,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) error {
-    _, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    _, err := q.db.WExec(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return err
     }
@@ -211,7 +211,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (int64, error) {
-    result, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    result, err := q.db.WExec(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return 0, err
     }
@@ -245,7 +245,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (pgconn.CommandTag, error) {
-    rv, err := q.db.WExec(ctx, "{{.MethodName}}", {{.ConstantName}}, {{.Arg.Params}})
+    rv, err := q.db.WExec(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return rv, err
     }
