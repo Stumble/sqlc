@@ -57,6 +57,10 @@ func (v QueryValue) Type() string {
 	panic("no type for QueryValue: " + v.Name)
 }
 
+func (v QueryValue) IsTypePointer() bool {
+	return !v.isEmpty() && strings.HasPrefix(v.Type(), "*")
+}
+
 func (v *QueryValue) DefineType() string {
 	t := v.Type()
 	if v.IsPointer() {
@@ -158,12 +162,12 @@ func (v QueryValue) CacheKeySprintf() string {
 	args := make([]string, 0)
 	for _, f := range v.Struct.Fields {
 		// TODO(yumin): pointer not supported for now.
-		if strings.Contains(v.Typ, "*") {
+		if strings.Contains(f.Type, "*") {
 			panic(fmt.Errorf("pointer arguments query cache not supported: %+v", v))
 		}
-		if strings.HasPrefix(v.Typ, "[]*") {
-			panic(fmt.Errorf("[]*T typed arguments query cache not supported: %+v", v))
-		}
+		// if strings.HasPrefix(f.Type, "[]*") {
+		// 	panic(fmt.Errorf("[]*T typed arguments query cache not supported: %+v", v))
+		// }
 		format = append(format, "%+v")
 		args = append(args, v.Name+"."+f.Name)
 	}
@@ -211,7 +215,7 @@ func (q Query) TableIdentifier() string {
 
 // CacheKey is used by WPgx only.
 func (q Query) CacheKey() string {
-	return genCacheKeyWithArgName(q.Pkg, q, q.Arg.Name, q.Arg.IsPointer())
+	return genCacheKeyWithArgName(q, q.Arg.Name, q.Arg.IsTypePointer())
 }
 
 // InvalidateArgs is used by WPgx only.
@@ -240,11 +244,11 @@ func (q Query) UniqueLabel() string {
 
 // CacheUniqueLabel is used by WPgx only.
 func (q Query) CacheUniqueLabel() string {
-	return fmt.Sprintf("%s:%s", q.Pkg, q.MethodName)
+	return fmt.Sprintf("%s:%s:", q.Pkg, q.MethodName)
 }
 
-func genCacheKeyWithArgName(pkg string, q Query, argName string, isPointer bool) string {
-	if len(pkg) == 0 {
+func genCacheKeyWithArgName(q Query, argName string, genPointerArgType bool) string {
+	if len(q.Pkg) == 0 {
 		panic("empty pkg name is invalid")
 	}
 	prefix := q.CacheUniqueLabel()
@@ -252,14 +256,18 @@ func genCacheKeyWithArgName(pkg string, q Query, argName string, isPointer bool)
 		return `"` + prefix + `"`
 	}
 	if q.Arg.Struct == nil {
-		if isPointer {
-			argName = "*" + argName
-		}
-		strValue := `hashIfLong(fmt.Sprintf("%+v",` + argName + `))`
-		return fmt.Sprintf("\"%s\" + %s", prefix, strValue)
+		return fmt.Sprintf("\"%s\" + %s",
+			prefix, singleArgCacheSprintf(argName, genPointerArgType))
 	} else {
 		return argName + `.CacheKey()`
 	}
+}
+
+func singleArgCacheSprintf(argName string, isPointer bool) string {
+	if isPointer {
+		argName = "*" + argName
+	}
+	return `hashIfLong(fmt.Sprintf("%+v",` + argName + `))`
 }
 
 type InvalidateParam struct {
