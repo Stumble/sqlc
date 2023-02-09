@@ -384,6 +384,8 @@ func (i *importer) queryImports(filename string) fileImports {
 		std["time"] = struct{}{}
 		std["fmt"] = struct{}{}
 		std["encoding/json"] = struct{}{}
+		std["crypto/sha256"] = struct{}{}
+		std["encoding/hex"] = struct{}{}
 	}
 
 	sqlpkg := parseDriver(i.Settings.Go.SqlPackage)
