@@ -238,11 +238,16 @@ func (q Query) UniqueLabel() string {
 	return fmt.Sprintf("%s.%s", q.Pkg, q.MethodName)
 }
 
+// CacheUniqueLabel is used by WPgx only.
+func (q Query) CacheUniqueLabel() string {
+	return fmt.Sprintf("%s:%s", q.Pkg, q.MethodName)
+}
+
 func genCacheKeyWithArgName(pkg string, q Query, argName string, isPointer bool) string {
 	if len(pkg) == 0 {
 		panic("empty pkg name is invalid")
 	}
-	prefix := pkg + ":" + q.MethodName
+	prefix := q.CacheUniqueLabel()
 	if q.Arg.isEmpty() {
 		return `"` + prefix + `"`
 	}
@@ -250,7 +255,8 @@ func genCacheKeyWithArgName(pkg string, q Query, argName string, isPointer bool)
 		if isPointer {
 			argName = "*" + argName
 		}
-		return `fmt.Sprintf("` + prefix + `:%+v",` + argName + `)`
+		strValue := `hashIfLong(fmt.Sprintf("%+v",` + argName + `))`
+		return fmt.Sprintf("\"%s\" + %s", prefix, strValue)
 	} else {
 		return argName + `.CacheKey()`
 	}
