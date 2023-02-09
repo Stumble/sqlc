@@ -17,8 +17,8 @@ type {{.Arg.Type}} struct { {{- range .Arg.Struct.Fields}}
 {{if and (ne .Cmd ":copyfrom") (ne .Option.Cache.Milliseconds 0)}}
 // CacheKey - cache key
 func ({{.Arg.Name}} {{.Arg.Type}}) CacheKey() string {
-    prefix := "{{.Pkg}}:{{.MethodName}}:"
-    return prefix + fmt.Sprintf({{.Arg.CacheKeySprintf}})
+    prefix := "{{.CacheUniqueLabel}}:"
+    return prefix + hashIfLong(fmt.Sprintf({{.Arg.CacheKeySprintf}}))
 }
 {{end}}
 
@@ -324,5 +324,21 @@ func (q *Queries) Load(ctx context.Context, data []byte) error {
     }
     return nil
 }
+
+func hashIfLong(v string) string {
+	if len(v) >	64 {
+		hash := sha256.Sum256([]byte(v))
+		return "h(" + hex.EncodeToString(hash[:]) + ")"
+	}
+	return v
+}
+
+// eliminate unused error
+var _ = log.Logger
+var _ = fmt.Sprintf("")
+var _ = time.Now()
+var _ = json.RawMessage{}
+var _ = sha256.Sum256(nil)
+var _ = hex.EncodeToString(nil)
 
 {{end}}
