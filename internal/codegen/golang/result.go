@@ -349,7 +349,7 @@ func buildQueryInvalidates(queries []Query) error {
 
 	for i := range queries {
 		mutation := &queries[i]
-		numMethodNameUsed := make(map[string]int)
+		unamer := NewUniqueNamer()
 		for _, toInvalidateName := range mutation.Option.Invalidates {
 			query := qmap[toInvalidateName]
 			if query.Option.Cache <= 0 {
@@ -357,19 +357,20 @@ func buildQueryInvalidates(queries []Query) error {
 					mutation.MethodName, toInvalidateName)
 			}
 			methodName := sdk.LowerTitle(query.MethodName)
-			argName := methodName
-			if numMethodNameUsed[methodName] > 0 {
-				argName = fmt.Sprintf("%s%d", argName, numMethodNameUsed[methodName])
-			}
-			cacheKey := genCacheKeyWithArgName(query.Pkg, *query, argName, true)
 			if query.Arg.isEmpty() {
 				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
 					Q:        query,
 					NoArg:    true,
-					CacheKey: cacheKey,
+					CacheKey: genCacheKeyWithArgName(*query, "", false), // string key
 				})
 			} else {
-				numMethodNameUsed[methodName] += 1
+				if query.Arg.IsTypePointer() {
+					return fmt.Errorf(
+						"invalidate pointer-typed argument is not supported: %s tries to invalidate %s",
+						mutation.MethodName, query.MethodName)
+				}
+				argName := unamer.UniqueName(methodName)
+				cacheKey := genCacheKeyWithArgName(*query, argName, true)
 				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
 					Q:        query,
 					ArgName:  argName,
