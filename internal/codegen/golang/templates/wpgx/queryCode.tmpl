@@ -333,6 +333,13 @@ func hashIfLong(v string) string {
 	return v
 }
 
+func ptrStr[T any](v *T) string {
+	if v == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%+v", *v)
+}
+
 // eliminate unused error
 var _ = log.Logger
 var _ = fmt.Sprintf("")
