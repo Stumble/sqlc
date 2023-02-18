@@ -18,7 +18,7 @@ as this combo.
 
 Production versions:
 
-+ sqlc: v2.1.3-wicked-fork
++ sqlc: v2.1.4-wicked-fork
 + dcache: v0.1.0
 + wgpx: v0.1.8
 
@@ -493,6 +493,28 @@ WHERE
   id = sqlc.arg('id');
 ```
 
+##### Versatile query
+
+Although it is **not** recommended, you can use `coalesce` function and `sqlc.narg`
+to build a versatile query that filter rows based different sets of conditions.
+
+```sql
+-- NOTE: dummy is a null-able column.
+-- name: GetBookBySpec :one
+-- -- cache : 10m
+SELECT * FROM books WHERE
+  name LIKE coalesce(sqlc.narg('name'), name) AND
+  price = coalesce(sqlc.narg('price'), price) AND
+  (sqlc.narg('dummy')::int is NULL or dummy_field = sqlc.narg('dummy'));
+```
+
+However, please note that you **CANNOT** apply this trick on null-able columns.
+The reason is: null never equals to null. In the above example, if we change the cond around
+'dummy' column to `dummy = coalesce(sqlc.narg('dummy'), dummy)`, all rows will be filtered out
+when `sqlc.narg('dummy')` is substituted by `null`.
+The correct way to shown in the example: instead of use 'coalesce', explicitly check if the value
+is null.
+
 ##### Refresh materialized view
 
 Refresh statement is supported, you can just list it as a query.
@@ -581,7 +603,7 @@ original camcal-case style. See below logs from psql.
 # \d test
                             Table "public.test"
    Column   |  Type   | Collation | Nullable |           Default
-------------+---------+-----------+----------+------------------------------
+------------|---------|-----------|----------|------------------------------
  id         | integer |           | not null | generated always as identity
  camelcase  | integer |           |          |
  snake_case | integer |           |          |
@@ -589,7 +611,7 @@ original camcal-case style. See below logs from psql.
 # \d test2
                             Table "public.test2"
    Column   |  Type   | Collation | Nullable |           Default
-------------+---------+-----------+----------+------------------------------
+------------|---------|-----------|----------|------------------------------
  id         | integer |           | not null | generated always as identity
  CamelCase  | integer |           |          |
  snake_case | integer |           |          |

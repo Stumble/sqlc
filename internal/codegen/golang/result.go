@@ -353,16 +353,20 @@ func buildQueryInvalidates(queries []Query) error {
 				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
 					Q:        query,
 					NoArg:    true,
-					CacheKey: genCacheKeyWithArgName(*query, "", false), // string key
+					CacheKey: genCacheKeyWithArgName(*query, ""), // string key
 				})
 			} else {
 				if query.Arg.IsTypePointer() {
-					return fmt.Errorf(
-						"invalidate pointer-typed argument is not supported: %s tries to invalidate %s",
+					err := fmt.Errorf(
+						"Although invalidate pointer-typed argument is supported (%s tries to invalidate %s) , the generated type will be **T",
 						mutation.MethodName, query.MethodName)
+					fmt.Printf("WARNING: %s\n", err)
 				}
 				argName := unamer.UniqueName(methodName)
-				cacheKey := genCacheKeyWithArgName(*query, argName, true)
+				// additional pointer will be added to invalidate query key,
+				// so when we generate cache key, add 1 additional deref.
+				derefArgName := fmt.Sprintf("(*%s)", argName)
+				cacheKey := genCacheKeyWithArgName(*query, derefArgName)
 				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
 					Q:        query,
 					ArgName:  argName,
