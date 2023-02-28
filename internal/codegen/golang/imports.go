@@ -180,6 +180,7 @@ func buildImports(settings *plugin.Settings, queries []Query, uses func(string) 
 
 		if q.Cmd == metadata.CmdOne && sqlpkg == SQLDriverWPGX {
 			pkg[ImportSpec{Path: "github.com/jackc/pgx/v5"}] = struct{}{}
+			pkg[ImportSpec{Path: "github.com/stumble/wpgx"}] = struct{}{}
 		}
 	}
 

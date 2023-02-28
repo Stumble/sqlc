@@ -92,6 +92,43 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{- end }}
     return {{.Ret.Name}}, err
 }
+
+// {{.MethodName}}Tx will execute the query {{.MethodName}} within the provided transaction.
+// Note: cache will not be used because this query is most likely a write query.
+func (q *Queries) {{.MethodName}}Tx(ctx context.Context, tx *wpgx.WTx, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
+    row := tx.WQueryRow(ctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
+    var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
+    err := row.Scan({{.Ret.Scan}})
+    if err == pgx.ErrNoRows {
+        return (*{{.Ret.Type}})(nil), nil
+    } else if err != nil {
+        return nil, err
+    }
+
+{{ if  .Option.Invalidates -}}
+    // invalidate
+    _ = tx.PostExec(func() error {
+        var anyErr error
+        {{ range .Invalidates -}}
+        {{ if not .NoArg -}}
+        if {{.ArgName}} != nil {
+        {{ end -}}
+            key := {{.CacheKey}}
+            err = q.cache.Invalidate(ctx, key)
+            if err != nil {
+                log.Error().Err(err).Msgf(
+                    "Failed to invalidate: %s", key)
+                anyErr = err
+            }
+        {{ if not .NoArg -}}
+        }
+        {{ end -}}
+        {{ end -}}
+        return anyErr
+    })
+{{- end }}
+    return {{.Ret.Name}}, err
+}
 {{end}}
 
 {{if eq .Cmd ":many"}}
