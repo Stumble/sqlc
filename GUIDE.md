@@ -691,7 +691,41 @@ TBD.
 
 ### Transaction
 
-TBD.
+You should use `Transact` function to make a transaction.
+
+```go
+func (u *Usecase) ListNewComicBookTx(ctx context.Context, bookName string, price float32) (id int, err error) {
+ rst, err := u.pool.Transact(ctx, pgx.TxOptions{}, func(ctx context.Context, tx *wpgx.WTx) (any, error) {
+  booksTx := u.books.WithTx(tx)
+  activitiesTx := u.activities.WithTx(tx)
+  id, err := booksTx.InsertAndReturnID(ctx, books.InsertAndReturnIDParams{
+   Name:        bookName,
+   Description: "book desc",
+   Metadata:    []byte("{}"),
+   Category:    books.BookCategoryComic,
+   Price:       0.1,
+  })
+  if err != nil {
+   return nil, err
+  }
+  if id == nil {
+   return nil, fmt.Errorf("nil id?")
+  }
+  param := strconv.Itoa(int(*id))
+  err = activitiesTx.Insert(ctx, activities.InsertParams{
+   Action:    "list a new comic book",
+   Parameter: &param,
+  })
+  return int(*id), err
+ })
+ if err != nil {
+  return 0, err
+ }
+ return rst.(int), nil
+}
+```
+
+This example can be found in bookstore example project.
 
 # Unit testing
 
@@ -821,7 +855,17 @@ type booksTableSerde struct {
 }
 
 func (b booksTableSerde) Load(data []byte) error {
-  return b.books.Load(context.Background(), data)
+  err := b.books.Load(context.Background(), data)
+  if err != nil {
+   return err
+  }
+  //  most of loader should just end here and return nil,
+  // but if you have a serial type in the table schema,
+  // we need to reset its next value after manual insertions.
+  // example SQL:
+  //   SELECT setval(seq_name, (SELECT MAX(id) FROM books)+1, false)
+  //   FROM PG_GET_SERIAL_SEQUENCE('books', 'id') as seq_name
+ return b.books.RefreshIDSerial(context.Background())
 }
 
 func (b booksTableSerde) Dump() ([]byte, error) {
