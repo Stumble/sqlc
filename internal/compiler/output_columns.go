@@ -119,8 +119,6 @@ func (c *Compiler) outputColumns(qc *QueryCatalog, node ast.Node) ([]*Column, er
 		targets = &ast.List{}
 	case *ast.UpdateStmt:
 		targets = n.ReturningList
-	case *ast.RefreshMatViewStmt:
-		targets = &ast.List{}
 	default:
 		return nil, fmt.Errorf("outputColumns: unsupported node type: %T", n)
 	}
