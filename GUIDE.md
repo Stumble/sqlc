@@ -524,6 +524,13 @@ Refresh statement is supported, you can just list it as a query.
 REFRESH MATERIALIZED VIEW CONCURRENTLY by_book_revenues;
 ```
 
+**NOTE**: 
+You should use `CONCURRENTLY` to refresh the materialized view without locking out concurrent selects on the materialized view. Without this option a refresh which affects a lot of rows will tend to use fewer resources and complete more quickly, but could block other connections which are trying to read from the materialized view. This option may be faster in cases where a small number of rows are affected.
+
+This option is **only allowed** if there is at least one `UNIQUE` index on the materialized view which uses only column names and includes all rows; that is, it must not be an expression index or include a WHERE clause.
+
+This option **may not** be used when the materialized view is not already populated. So for the first time, you need to populate it with non concurrent refresh.
+
 ### SQL Naming conventions
 
 In short, for table and column names, always use 'snake_case'.
