@@ -38,6 +38,7 @@ func (r iteratorFor{{.MethodName}}) Err() error {
 {{range .Comments}}//{{.}}
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.SlicePair}}) (int64, error) {
+    q.db.CountIntent("{{.UniqueLabel}}")
 	return q.db.WCopyFrom(ctx, "{{.UniqueLabel}}", {{.TableIdentifierAsGoSlice}}, {{.Arg.ColumnNamesAsGoSlice}}, &iteratorFor{{.MethodName}}{rows: {{.Arg.Name}}})
 }
 
