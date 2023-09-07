@@ -7,13 +7,15 @@ import (
 )
 
 const (
-	WPgxOptionKeyCache      = "cache"
-	WPgxOptionKeyInvalidate = "invalidate"
+	WPgxOptionKeyCache       = "cache"
+	WPgxOptionKeyInvalidate  = "invalidate"
+	WpgxOptionKeyCountIntent = "count_intent"
 )
 
 type WPgxOption struct {
 	Cache       time.Duration
 	Invalidates []string
+	CountIntent bool
 }
 
 func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgxOption, err error) {
@@ -24,7 +26,7 @@ func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgx
 			if err != nil {
 				return
 			}
-			if rv.Cache < 1 * time.Millisecond {
+			if rv.Cache < 1*time.Millisecond {
 				return rv, fmt.Errorf("cache duration too short: %s", v)
 			}
 		case WPgxOptionKeyInvalidate:
@@ -37,6 +39,16 @@ func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgx
 				}
 				rv.Invalidates = append(rv.Invalidates, queryName)
 			}
+		case WpgxOptionKeyCountIntent:
+			if v == "true" {
+				rv.CountIntent = true
+			} else if v == "false" {
+				rv.CountIntent = false
+			} else {
+				return rv, fmt.Errorf("Unknown count_intent value: %s", v)
+			}
+		default:
+			return rv, fmt.Errorf("Unknown option: %s", k)
 		}
 	}
 	return

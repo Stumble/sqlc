@@ -6,8 +6,6 @@ import (
 
 	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/sql/ast"
-
-	"github.com/sqlc-dev/sqlc/internal/codegen/golang"
 )
 
 func validateCopyfrom(n ast.Node) error {
@@ -79,10 +77,6 @@ func Cmd(n ast.Node, name, cmd string, options map[string]string) error {
 	}
 	if list == nil || len(list.Items) == 0 {
 		return fmt.Errorf("query %q specifies parameter %q without containing a RETURNING clause", name, cmd)
-	}
-	// XXX(yumin): dirty hack here to use the wpgx options here.
-	if _, ok := options[golang.WPgxOptionKeyCache]; ok {
-		return fmt.Errorf("query %q uses cache option but is not a SELECT", name)
 	}
 	return nil
 }

@@ -296,6 +296,11 @@ func (q Query) TableIdentifierForMySQL() string {
 	return strings.Join(escapedNames, ".")
 }
 
+// CountIntent is used by WPgx only.
+func (q Query) CountIntent() bool {
+	return q.Option.CountIntent
+}
+
 // CacheKey is used by WPgx only.
 func (q Query) CacheKey() string {
 	return genCacheKeyWithArgName(q, q.Arg.Name)

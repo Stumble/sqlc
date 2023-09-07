@@ -15,6 +15,8 @@ import (
 	"github.com/sqlc-dev/sqlc/internal/sql/astutils"
 	"github.com/sqlc-dev/sqlc/internal/sql/rewrite"
 	"github.com/sqlc-dev/sqlc/internal/sql/validate"
+
+	"github.com/sqlc-dev/sqlc/internal/codegen/golang"
 )
 
 var ErrUnsupportedStatementType = errors.New("parseQuery: unsupported statement type")
@@ -77,6 +79,11 @@ func (c *Compiler) parseQuery(stmt ast.Node, src string, o opts.Parser) (*Query,
 	raw, namedParams, edits := rewrite.NamedParameters(c.conf.Engine, raw, numbers, dollar)
 	if err := validate.Cmd(
 		raw.Stmt, queryConfig.Name, queryConfig.Cmd, queryConfig.Options); err != nil {
+		return nil, err
+	}
+	err = validateAndSetDefaultOptions(
+		raw.Stmt, queryConfig.Name, queryConfig.Cmd, queryConfig.Options)
+	if err != nil {
 		return nil, err
 	}
 	rvs := rangeVars(raw.Stmt)
@@ -182,4 +189,30 @@ func uniqueParamRefs(in []paramRef, dollar bool) []paramRef {
 		}
 	}
 	return o
+}
+
+// wicked-sqlc specific function
+func validateAndSetDefaultOptions(n ast.Node, name, cmd string, options map[string]string) error {
+	countIntent, hasCountIntentDefaultVal := options[golang.WpgxOptionKeyCountIntent]
+	if !(cmd == metadata.CmdMany || cmd == metadata.CmdOne) {
+		if countIntent == "true" {
+			return fmt.Errorf(
+				"query %q uses count_intent option but cmd is neither 'one' or 'many'", name)
+		}
+		return nil
+	}
+	_, isSelect := n.(*ast.SelectStmt)
+	if !hasCountIntentDefaultVal {
+		if isSelect {
+			options[golang.WpgxOptionKeyCountIntent] = "true"
+		} else {
+			options[golang.WpgxOptionKeyCountIntent] = "false"
+		}
+	}
+	if !isSelect {
+		if _, ok := options[golang.WPgxOptionKeyCache]; ok {
+			return fmt.Errorf("query %q uses cache option but is not a SELECT", name)
+		}
+	}
+	return nil
 }
