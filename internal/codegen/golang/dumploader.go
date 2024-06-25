@@ -68,11 +68,11 @@ func (d DumpLoader) ParamList() string {
 }
 
 func (d DumpLoader) DumpSQL() string {
-	return fmt.Sprintf("SELECT %s FROM %s ORDER BY %s ASC;",
+	return fmt.Sprintf(`SELECT %s FROM \"%s\" ORDER BY %s ASC;`,
 		d.FieldDBNames(), d.MainStruct.Table.Name, d.DumpSortByFields())
 }
 
 func (d DumpLoader) LoadSQL() string {
-	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);",
+	return fmt.Sprintf(`INSERT INTO \"%s\" (%s) VALUES (%s);`,
 		d.MainStruct.Table.Name, d.FieldDBNames(), d.ParamList())
 }
