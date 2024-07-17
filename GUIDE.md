@@ -19,7 +19,7 @@ as this combo.
 Production versions:
 
 + sqlc: v2.2.1-wicked-fork
-+ dcache: v0.2.0 (Note: redis/v8 users please use v0.1.4)
++ dcache: v0.3.0 (Note: redis/v8 users please use v0.1.4)
 + wgpx: v0.2.3
 
 # Sqlc (this wicked fork)
@@ -54,9 +54,10 @@ your customers are disappointed, or (2) before the product is launched, writing 
 # cgo must be enabled because: https://github.com/pganalyze/pg_query_go
 git clone https://github.com/Stumble/sqlc.git
 cd sqlc/
+git checkout v2.2.1
 make install
 sqlc version
-# you shall see: v*****-wicked-fork
+# you shall see: v2.2.1-wicked-fork
 ```
 
 ## Getting started
