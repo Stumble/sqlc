@@ -141,7 +141,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
         rows, err := q.db.WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
         if err != nil {
-            return nil, 0, err
+            return []{{.Ret.Type}}(nil), 0, err
         }
         defer rows.Close()
         var items []{{.Ret.Type}}
