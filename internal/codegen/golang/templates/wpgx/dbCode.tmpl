@@ -39,7 +39,16 @@ func (q *Queries) AsReadOnly() *ReadOnlyQueries {
 	}
 }
 
+// WithTx returns a new Queries with the provided wpgx.WTx.
+// NOTE: Cache will be disabled for Tx queries.
 func (q *Queries) WithTx(tx *wpgx.WTx) *Queries {
+	return &Queries{
+		db:    tx,
+	}
+}
+
+// WithTxCacheKept returns a new Queries with the provided wpgx.WTx, with cache kept.
+func (q *Queries) WithTxCacheKept(tx *wpgx.WTx) *Queries {
 	return &Queries{
 		db:    tx,
 		cache: q.cache,
