@@ -35,16 +35,27 @@ type {{.Ret.Type}} struct { {{- range .Ret.Struct.Fields}}
 {{if eq .Cmd ":one"}}
 {{range .Comments}}//{{.}}
 {{end -}}
+
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
+	return _{{.MethodName}}(ctx, {{- if .IsConnTypeQuerier }}q.AsReadOnly(){{else}}q{{- end}}, {{.Arg.Name}} {{.InvalidateArgsNames}})
+}
+
+{{ if .AllowReplica }}
+func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (*{{.Ret.Type}}, error) {
+	return _{{.MethodName}}(ctx, q, {{.Arg.Name}})
+}
+{{- end}}
+
+func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
 {{- if gt .Option.Timeout.Milliseconds 0 }}
     qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
     defer cancel()
 {{- end}}
 {{- if .CountIntent }}
-    q.db.CountIntent("{{.UniqueLabel}}")
+    q.GetConn().CountIntent("{{.UniqueLabel}}")
 {{- end}}
 {{- if eq .Option.Cache.Milliseconds 0}}
-    row := q.db.WQueryRow(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
+    row := q.GetConn().WQueryRow(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
     err := row.Scan({{.Ret.Scan}})
     if err == pgx.ErrNoRows {
@@ -55,7 +66,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{else}}
     dbRead := func() (any, time.Duration, error) {
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
-        row := q.db.WQueryRow(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
+        row := q.GetConn().WQueryRow(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
         var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
         err := row.Scan({{.Ret.Scan}})
         if err == pgx.ErrNoRows {
@@ -63,13 +74,13 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         }
         return {{.Ret.Name}}, cacheDuration, err
     }
-    if q.cache == nil {
+    if q.GetCache() == nil {
         {{.Ret.Name}}, _, err := dbRead()
         return {{.Ret.Name}}.(*{{.Ret.Type}}), err
     }
 
     var {{.Ret.Name}} *{{.Ret.Type}}
-    err := q.cache.GetWithTtl(qctx, {{.CacheKey}}, &{{.Ret.Name}}, dbRead, false, false)
+    err := q.GetCache().GetWithTtl(qctx, {{.CacheKey}}, &{{.Ret.Name}}, dbRead, false, false)
     if err != nil {
         return nil, err
     }
@@ -77,7 +88,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 
 {{ if  .Option.Invalidates -}}
     // invalidate
-    _ = q.db.PostExec(func() error {
+    _ = q.GetConn().PostExec(func() error {
 		anyErr := make(chan error, {{len .Invalidates}})
 		var wg sync.WaitGroup
         wg.Add({{len .Invalidates}})
@@ -88,7 +99,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         if {{.ArgName}} != nil {
         {{ end -}}
             key := {{.CacheKey}}
-            err = q.cache.Invalidate(ctx, key)
+            err = q.GetCache().Invalidate(ctx, key)
             if err != nil {
                 log.Ctx(ctx).Error().Err(err).Msgf(
                     "Failed to invalidate: %s", key)
@@ -111,16 +122,27 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{if eq .Cmd ":many"}}
 {{range .Comments}}//{{.}}
 {{end -}}
+
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.Type}}, error) {
+	return _{{.MethodName}}(ctx, {{- if .IsConnTypeQuerier }}q.AsReadOnly(){{else}}q{{- end}}, {{.Arg.Name}} {{.InvalidateArgsNames}})
+}
+
+{{ if .AllowReplica }}
+func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) ([]{{.Ret.Type}}, error) {
+	return _{{.MethodName}}(ctx, q, {{.Arg.Name}})
+}
+{{- end}}
+
+func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.Type}}, error) {
 {{- if gt .Option.Timeout.Milliseconds 0 }}
     qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
     defer cancel()
 {{- end}}
 {{- if .CountIntent }}
-    q.db.CountIntent("{{.UniqueLabel}}")
+    q.GetConn().CountIntent("{{.UniqueLabel}}")
 {{- end}}
 {{- if eq .Option.Cache.Milliseconds 0}}
-    rows, err := q.db.WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
+    rows, err := q.GetConn().WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return nil, err
     }
@@ -139,7 +161,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{else}}
     dbRead := func() (any, time.Duration, error) {
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
-        rows, err := q.db.WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
+        rows, err := q.GetConn().WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
         if err != nil {
             return []{{.Ret.Type}}(nil), 0, err
         }
@@ -157,12 +179,12 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         }
         return items, cacheDuration, nil
     }
-    if q.cache == nil {
+    if q.GetCache() == nil {
         items, _, err := dbRead()
         return items.([]{{.Ret.Type}}), err
     }
     var items []{{.Ret.Type}}
-    err := q.cache.GetWithTtl(qctx, {{.CacheKey}}, &items, dbRead, false, false)
+    err := q.GetCache().GetWithTtl(qctx, {{.CacheKey}}, &items, dbRead, false, false)
     if err != nil {
         return nil, err
     }
@@ -170,7 +192,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 
 {{ if  .Option.Invalidates -}}
     // invalidate
-    _ = q.db.PostExec(func() error {
+    _ = q.GetConn().PostExec(func() error {
 		anyErr := make(chan error, {{len .Invalidates}})
 		var wg sync.WaitGroup
         wg.Add({{len .Invalidates}})
@@ -181,7 +203,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         if {{.ArgName}} != nil {
         {{ end -}}
             key := {{.CacheKey}}
-            err = q.cache.Invalidate(ctx, key)
+            err = q.GetCache().Invalidate(ctx, key)
             if err != nil {
                 log.Ctx(ctx).Error().Err(err).Msgf(
                     "Failed to invalidate: %s", key)

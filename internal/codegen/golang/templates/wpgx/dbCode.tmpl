@@ -3,6 +3,16 @@
 // BeforeDump allows you to edit result before dump.
 type BeforeDump func(m *{{.DumpLoader.MainStructName}})
 
+type CacheQuerierConn interface {
+	GetCache() *dcache.DCache
+	GetConn() wpgx.WQuerier
+}
+
+type CacheWGConn interface {
+	GetCache() *dcache.DCache
+	GetConn() wpgx.WGConn
+}
+
 func New(db wpgx.WGConn, cache *dcache.DCache) *Queries {
 	return &Queries{db: db, cache: cache}
 }
@@ -10,6 +20,23 @@ func New(db wpgx.WGConn, cache *dcache.DCache) *Queries {
 type Queries struct {
 	db    wpgx.WGConn
 	cache *dcache.DCache
+}
+
+var _ CacheWGConn = (*Queries)(nil)
+
+func (q *Queries) GetCache() *dcache.DCache {
+	return q.cache
+}
+
+func (q *Queries) GetConn() wpgx.WGConn {
+	return q.db
+}
+
+func (q *Queries) AsReadOnly() *ReadOnlyQueries {
+	return &ReadOnlyQueries{
+		db:    q.db,
+		cache: q.cache,
+	}
 }
 
 func (q *Queries) WithTx(tx *wpgx.WTx) *Queries {
@@ -24,6 +51,35 @@ func (q *Queries) WithCache(cache *dcache.DCache) *Queries {
 		db:    q.db,
 		cache: cache,
 	}
+}
+
+func (q *Queries) UseReplica(replicaQuerier wpgx.WQuerier) *ReadOnlyQueries {
+	return &ReadOnlyQueries{
+		db:    replicaQuerier,
+		cache: q.cache,
+	}
+}
+
+type ReadOnlyQueries struct {
+	db    wpgx.WQuerier
+	cache *dcache.DCache
+}
+
+var _ CacheQuerierConn = (*ReadOnlyQueries)(nil)
+
+func (q *ReadOnlyQueries) WithCache(cache *dcache.DCache) *ReadOnlyQueries {
+	return &ReadOnlyQueries{
+		db:    q.db,
+		cache: cache,
+	}
+}
+
+func (q *ReadOnlyQueries) GetCache() *dcache.DCache {
+	return q.cache
+}
+
+func (q *ReadOnlyQueries) GetConn() wpgx.WQuerier {
+	return q.db
 }
 
 var Schema = {{$.Q}}

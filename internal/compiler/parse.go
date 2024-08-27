@@ -193,25 +193,44 @@ func uniqueParamRefs(in []paramRef, dollar bool) []paramRef {
 
 // wicked-sqlc specific function
 func validateAndSetDefaultOptions(n ast.Node, name, cmd string, options map[string]string) error {
-	countIntent, hasCountIntentDefaultVal := options[golang.WpgxOptionKeyCountIntent]
-	if !(cmd == metadata.CmdMany || cmd == metadata.CmdOne) {
-		if countIntent == "true" {
-			return fmt.Errorf(
-				"query %q uses count_intent option but cmd is neither 'one' or 'many'", name)
-		}
-		return nil
-	}
+	// looksLikeQuery := (cmd == metadata.CmdMany || cmd == metadata.CmdOne)
 	_, isSelect := n.(*ast.SelectStmt)
-	if !hasCountIntentDefaultVal {
-		if isSelect {
-			options[golang.WpgxOptionKeyCountIntent] = "true"
-		} else {
-			options[golang.WpgxOptionKeyCountIntent] = "false"
-		}
+
+	// count_intent option validation and default value setting
+	err := validateOrDefaultSelectOnlyBoolOption(isSelect, name, golang.WpgxOptionKeyCountIntent, options)
+	if err != nil {
+		return err
 	}
-	if !isSelect {
-		if _, ok := options[golang.WPgxOptionKeyCache]; ok {
-			return fmt.Errorf("query %q uses cache option but is not a SELECT", name)
+
+	// allow replica option validation and default value setting
+	err = validateOrDefaultSelectOnlyBoolOption(isSelect, name, golang.WpgxOptionKeyAllowReplica, options)
+	if err != nil {
+		return err
+	}
+
+	// mutex option validation
+	_, hasInvalidate := options[golang.WPgxOptionKeyInvalidate]
+	if isSelect && hasInvalidate {
+		return fmt.Errorf("query %q uses invalidate option but is a SELECT", name)
+	}
+
+	return nil
+}
+
+func validateOrDefaultSelectOnlyBoolOption(isSelect bool, queryName string, optionKey string, options map[string]string) error {
+	v, ok := options[optionKey]
+	if !ok {
+		if isSelect {
+			options[optionKey] = "true"
+		} else {
+			options[optionKey] = "false"
+		}
+	} else {
+		if v != "true" && v != "false" {
+			return fmt.Errorf("query %q has invalid %s value: %s", queryName, optionKey, v)
+		}
+		if !isSelect && v == "true" {
+			return fmt.Errorf("query %q uses %s option but is not a SELECT", optionKey, queryName)
 		}
 	}
 	return nil

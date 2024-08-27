@@ -7,17 +7,19 @@ import (
 )
 
 const (
-	WPgxOptionKeyCache       = "cache"
-	WPgxOptionKeyInvalidate  = "invalidate"
-	WpgxOptionKeyCountIntent = "count_intent"
-	WpgxOptionKeyTimeout     = "timeout"
+	WPgxOptionKeyCache        = "cache"
+	WPgxOptionKeyInvalidate   = "invalidate"
+	WpgxOptionKeyCountIntent  = "count_intent"
+	WpgxOptionKeyTimeout      = "timeout"
+	WpgxOptionKeyAllowReplica = "allow_replica"
 )
 
 type WPgxOption struct {
-	Cache       time.Duration
-	Invalidates []string
-	CountIntent bool
-	Timeout     time.Duration
+	Cache        time.Duration
+	Invalidates  []string
+	CountIntent  bool
+	Timeout      time.Duration
+	AllowReplica bool
 }
 
 func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgxOption, err error) {
@@ -56,6 +58,14 @@ func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgx
 			}
 			if rv.Timeout < 1*time.Millisecond {
 				return rv, fmt.Errorf("timeout duration too short: %s", v)
+			}
+		case WpgxOptionKeyAllowReplica:
+			if v == "true" {
+				rv.AllowReplica = true
+			} else if v == "false" {
+				rv.AllowReplica = false
+			} else {
+				return rv, fmt.Errorf("Unknown allow_replica value: %s", v)
 			}
 		default:
 			return rv, fmt.Errorf("Unknown option: %s", k)

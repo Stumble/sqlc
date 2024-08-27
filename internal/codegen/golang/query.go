@@ -48,7 +48,7 @@ func (v QueryValue) Pair() string {
 	for _, arg := range v.Pairs() {
 		out = append(out, arg.Name+" "+arg.Type)
 	}
-	return strings.Join(out, ",")
+	return strings.TrimRight(strings.Join(out, ","), ",")
 }
 
 // Return the argument name and type for query methods. Should only be used in
@@ -147,10 +147,10 @@ func (v QueryValue) Params() string {
 		}
 	}
 	if len(out) <= 3 {
-		return strings.Join(out, ",")
+		return strings.TrimRight(strings.Join(out, ","), ",")
 	}
 	out = append(out, "")
-	return "\n" + strings.Join(out, ",\n")
+	return strings.TrimRight(("\n" + strings.Join(out, ",\n")), ",\n")
 }
 
 func (v QueryValue) ColumnNames() []string {
@@ -325,6 +325,11 @@ func (q Query) CountIntent() bool {
 	return q.Option.CountIntent
 }
 
+// AllowReplica is used by WPgx only.
+func (q Query) AllowReplica() bool {
+	return q.Option.AllowReplica
+}
+
 // CacheKey is used by WPgx only.
 func (q Query) CacheKey() string {
 	return genCacheKeyWithArgName(q, q.Arg.Name)
@@ -333,8 +338,9 @@ func (q Query) CacheKey() string {
 // InvalidateArgs is used by WPgx only.
 func (q Query) InvalidateArgs() string {
 	rv := ""
+	// pretty hacky, but works...
 	if !q.Arg.isEmpty() {
-		rv = ", "
+		rv = ","
 	}
 	for _, inv := range q.Invalidates {
 		if inv.NoArg {
@@ -343,7 +349,23 @@ func (q Query) InvalidateArgs() string {
 		t := "*" + inv.Q.Arg.Type()
 		rv += fmt.Sprintf("%s %s,", inv.ArgName, t)
 	}
-	return rv
+	return strings.TrimRight(rv, ",")
+}
+
+// InvalidateArgsNames is used by WPgx only.
+func (q Query) InvalidateArgsNames() string {
+	rv := ""
+	// pretty hacky, but works...
+	if !q.Arg.isEmpty() {
+		rv = ", "
+	}
+	for _, inv := range q.Invalidates {
+		if inv.NoArg {
+			continue
+		}
+		rv += inv.ArgName + ","
+	}
+	return strings.TrimRight(rv, ",")
 }
 
 // UniqueLabel is used by WPgx only.
@@ -354,6 +376,25 @@ func (q Query) UniqueLabel() string {
 // CacheUniqueLabel is used by WPgx only.
 func (q Query) CacheUniqueLabel() string {
 	return fmt.Sprintf("%s:%s:", q.Pkg, q.MethodName)
+}
+
+// ConnType is used by WPgx only.
+// Returns the interface type that the query should be called on, either CacheWGConn or CacheQuerierConn.
+// NOTE: because we have check the mutually exclusiveness, that invalidates can only happen on
+// queries that are not read-only, we can safely assume that if the query does not have invalidates,
+// CacheQuerierConn is enough.
+func (q Query) ConnType() string {
+	if len(q.Invalidates) > 0 {
+		return "CacheWGConn"
+	} else {
+		return "CacheQuerierConn"
+	}
+}
+
+// IsConnTypeQuerier is used by WPgx only.
+// Returns true if the query should be called on CacheQuerierConn.
+func (q Query) IsConnTypeQuerier() bool {
+	return len(q.Invalidates) == 0
 }
 
 func genCacheKeyWithArgName(q Query, argName string) string {
