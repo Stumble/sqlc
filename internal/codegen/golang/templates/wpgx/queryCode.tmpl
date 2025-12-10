@@ -1,4 +1,24 @@
 {{define "queryCodeWPgx"}}
+
+type queryOption struct {
+  NoCache bool
+  NoStore bool
+}
+
+type QueryOption func(*queryOption)
+
+func NoCache() QueryOption {
+  return func(opt *queryOption) {
+    opt.NoCache = true
+  }
+}
+
+func NoStore() QueryOption {
+  return func(opt *queryOption) {
+    opt.NoStore = true
+  }
+}
+
 {{range .GoQueries}}
 {{if $.OutputQuery .SourceName}}
 {{if and (ne .Cmd ":copyfrom") (ne (hasPrefix .Cmd ":batch") true)}}
@@ -36,17 +56,22 @@ type {{.Ret.Type}} struct { {{- range .Ret.Struct.Fields}}
 {{range .Comments}}//{{.}}
 {{end -}}
 
-func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
-	return _{{.MethodName}}(ctx, {{- if .IsConnTypeQuerier }}q.AsReadOnly(){{else}}q{{- end}}, {{.Arg.Name}} {{.InvalidateArgsNames}})
+func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}, opts ...QueryOption) (*{{.Ret.Type}}, error) {
+	return _{{.MethodName}}(ctx, {{- if .IsConnTypeQuerier }}q.AsReadOnly(){{else}}q{{- end}}, {{.Arg.Name}} {{.InvalidateArgsNames}}, opts...)
 }
 
 {{ if .AllowReplica }}
-func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (*{{.Ret.Type}}, error) {
-	return _{{.MethodName}}(ctx, q, {{.Arg.Name}})
+func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}, opts ...QueryOption) (*{{.Ret.Type}}, error) {
+	return _{{.MethodName}}(ctx, q, {{.Arg.Name}}, opts...)
 }
 {{- end}}
 
-func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
+func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}, opts ...QueryOption) (*{{.Ret.Type}}, error) {
+  var opt queryOption
+  for _, o := range opts {
+    o(&opt)
+  }
+
 {{- if gt .Option.Timeout.Milliseconds 0 }}
     qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
     defer cancel()
@@ -80,7 +105,7 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
     }
 
     var {{.Ret.Name}} *{{.Ret.Type}}
-    err := q.GetCache().GetWithTtl(qctx, {{.CacheKey}}, &{{.Ret.Name}}, dbRead, false, false)
+    err := q.GetCache().GetWithTtl(qctx, {{.CacheKey}}, &{{.Ret.Name}}, dbRead, opt.NoCache, opt.NoStore)
     if err != nil {
         return nil, err
     }
@@ -123,17 +148,21 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
 {{range .Comments}}//{{.}}
 {{end -}}
 
-func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.Type}}, error) {
-	return _{{.MethodName}}(ctx, {{- if .IsConnTypeQuerier }}q.AsReadOnly(){{else}}q{{- end}}, {{.Arg.Name}} {{.InvalidateArgsNames}})
+func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}, opts ...QueryOption) ([]{{.Ret.Type}}, error) {
+	return _{{.MethodName}}(ctx, {{- if .IsConnTypeQuerier }}q.AsReadOnly(){{else}}q{{- end}}, {{.Arg.Name}} {{.InvalidateArgsNames}}, opts...)
 }
 
 {{ if .AllowReplica }}
-func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) ([]{{.Ret.Type}}, error) {
+func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}, opts ...QueryOption) ([]{{.Ret.Type}}, error) {
 	return _{{.MethodName}}(ctx, q, {{.Arg.Name}})
 }
 {{- end}}
 
-func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.Type}}, error) {
+func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}, opts ...QueryOption) ([]{{.Ret.Type}}, error) {
+  var opt queryOption
+  for _, o := range opts {
+    o(&opt)
+  }
 {{- if gt .Option.Timeout.Milliseconds 0 }}
     qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
     defer cancel()
@@ -184,7 +213,7 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
         return items.([]{{.Ret.Type}}), err
     }
     var items []{{.Ret.Type}}
-    err := q.GetCache().GetWithTtl(qctx, {{.CacheKey}}, &items, dbRead, false, false)
+    err := q.GetCache().GetWithTtl(qctx, {{.CacheKey}}, &items, dbRead, opt.NoCache, opt.NoStore)
     if err != nil {
         return nil, err
     }
