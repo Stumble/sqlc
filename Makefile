@@ -1,14 +1,16 @@
 CGO_ENABLED = 1
 COMMIT_HASH := $(shell git --no-pager describe --tags --always --dirty)
 LDFLAGS = "-X github.com/sqlc-dev/sqlc/internal/info.Version=$(COMMIT_HASH)-wicked-fork"
+# macOS 15.4+ needs strchrnul fix
+BUILD_ENV = $(shell [ "$$(uname -s)" = "Darwin" ] && [ "$$(sw_vers -productVersion | cut -d. -f1)" -ge 15 ] && echo 'MACOSX_DEPLOYMENT_TARGET=15.4 CGO_CFLAGS="-DHAVE_STRCHRNUL"')
 
 .PHONY: build build-endtoend test test-ci test-examples test-endtoend regen start psql mysqlsh proto
 
 build:
-	CGO_ENABLED=$(CGO_ENABLED) go build -ldflags=$(LDFLAGS) -o bin/ ./cmd/...
+	$(BUILD_ENV) CGO_ENABLED=$(CGO_ENABLED) go build -ldflags=$(LDFLAGS) -o bin/ ./cmd/...
 
 install:
-	CGO_ENABLED=$(CGO_ENABLED) go install -ldflags=$(LDFLAGS) ./cmd/...
+	$(BUILD_ENV) CGO_ENABLED=$(CGO_ENABLED) go install -ldflags=$(LDFLAGS) ./cmd/...
 
 test:
 	CGO_ENABLED=$(CGO_ENABLED) go test ./...
