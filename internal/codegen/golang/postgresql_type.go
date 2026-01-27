@@ -659,9 +659,9 @@ func wpgxPostgresType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 			return "*bool"
 		}
 	case "json":
-		return "[]byte"
+		return "json.RawMessage"
 	case "jsonb":
-		return "[]byte"
+		return "json.RawMessage"
 	case "bytea", "blob", "pg_catalog.bytea":
 		return "[]byte"
 	case "date":
