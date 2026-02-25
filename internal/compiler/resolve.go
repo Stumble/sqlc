@@ -62,8 +62,27 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 		}
 		table, err := c.GetTable(fqn)
 		if err != nil {
-			// If the table name doesn't exist, fisrt check if it's a CTE
-			if _, qcerr := qc.GetTable(fqn); qcerr != nil {
+			// If the table name doesn't exist, first check if it's a CTE
+			cteTable, qcerr := qc.GetTable(fqn)
+			if qcerr != nil {
+				return nil, err
+			}
+			// Index CTE columns into typeMap for param resolution
+			cteCols := make([]*catalog.Column, 0, len(cteTable.Columns))
+			for _, col := range cteTable.Columns {
+				cc := &catalog.Column{
+					Name:      col.Name,
+					Type:      ast.TypeName{Name: col.DataType},
+					IsNotNull: col.NotNull,
+					IsArray:   col.IsArray,
+					ArrayDims: col.ArrayDims,
+				}
+				cteCols = append(cteCols, cc)
+			}
+			if err := indexTable(catalog.Table{
+				Rel:     cteTable.Rel,
+				Columns: cteCols,
+			}); err != nil {
 				return nil, err
 			}
 			continue

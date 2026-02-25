@@ -1,0 +1,7 @@
+CREATE TABLE items (
+    id BIGSERIAL PRIMARY KEY,
+    job_id BIGINT NOT NULL,
+    title TEXT NOT NULL,
+    published_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
