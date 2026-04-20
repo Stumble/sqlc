@@ -89,6 +89,9 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
 {{ if  .Option.Invalidates -}}
     // invalidate
     _ = q.GetConn().PostExec(func() error {
+        if q.GetCache() == nil {
+            return nil
+        }
 		anyErr := make(chan error, {{len .Invalidates}})
 		var wg sync.WaitGroup
         wg.Add({{len .Invalidates}})
@@ -193,6 +196,9 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
 {{ if  .Option.Invalidates -}}
     // invalidate
     _ = q.GetConn().PostExec(func() error {
+        if q.GetCache() == nil {
+            return nil
+        }
 		anyErr := make(chan error, {{len .Invalidates}})
 		var wg sync.WaitGroup
         wg.Add({{len .Invalidates}})
@@ -238,6 +244,9 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{ if  .Option.Invalidates -}}
     // invalidate
     _ = q.db.PostExec(func() error {
+        if q.cache == nil {
+            return nil
+        }
 		anyErr := make(chan error, {{len .Invalidates}})
 		var wg sync.WaitGroup
         wg.Add({{len .Invalidates}})
@@ -283,6 +292,9 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{ if  .Option.Invalidates -}}
     // invalidate
     _ = q.db.PostExec(func() error {
+        if q.cache == nil {
+            return nil
+        }
 		anyErr := make(chan error, {{len .Invalidates}})
 		var wg sync.WaitGroup
         wg.Add({{len .Invalidates}})
@@ -328,6 +340,9 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{ if  .Option.Invalidates -}}
     // invalidate
     _ = q.db.PostExec(func() error {
+        if q.cache == nil {
+            return nil
+        }
 		anyErr := make(chan error, {{len .Invalidates}})
 		var wg sync.WaitGroup
         wg.Add({{len .Invalidates}})
