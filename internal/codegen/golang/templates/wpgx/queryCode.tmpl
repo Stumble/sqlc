@@ -237,11 +237,17 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
     qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
     defer cancel()
 {{- end}}
-    _, err := q.db.WExec(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
+    {{ if .Option.Invalidates }}cmd{{ else }}_{{ end }}, err := q.db.WExec(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return err
     }
 {{ if  .Option.Invalidates -}}
+    // Zero-row DML changed nothing: cached entries are still valid, skip
+    // invalidation. Non-row commands (e.g. TRUNCATE) report zero rows but
+    // do mutate state, so they always invalidate.
+    if cmd.RowsAffected() == 0 && (cmd.Insert() || cmd.Update() || cmd.Delete()) {
+        return nil
+    }
     // invalidate
     _ = q.db.PostExec(func() error {
         if q.cache == nil {
@@ -290,6 +296,10 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         return 0, err
     }
 {{ if  .Option.Invalidates -}}
+    // Zero-row DML changed nothing: skip invalidation (see :exec).
+    if result.RowsAffected() == 0 && (result.Insert() || result.Update() || result.Delete()) {
+        return 0, nil
+    }
     // invalidate
     _ = q.db.PostExec(func() error {
         if q.cache == nil {
@@ -338,6 +348,10 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
         return rv, err
     }
 {{ if  .Option.Invalidates -}}
+    // Zero-row DML changed nothing: skip invalidation (see :exec).
+    if rv.RowsAffected() == 0 && (rv.Insert() || rv.Update() || rv.Delete()) {
+        return rv, nil
+    }
     // invalidate
     _ = q.db.PostExec(func() error {
         if q.cache == nil {
