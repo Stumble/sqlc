@@ -266,13 +266,9 @@ func scoreParamRefForTypeInference(ref paramRef) int {
 		return 40
 
 	case *ast.ResTarget:
-		// INSERT/UPDATE assignment targets identify their relation directly.
-		// Keep that binding ahead of an equally informative comparison in a
-		// nested query, where an unqualified column can be ambiguous.
-		if ref.rv != nil {
-			return 100
-		}
-		// SELECT target or similar - can be good for type inference
+		// Preserve the existing preference for comparisons over assignments.
+		// A nullable assignment column does not by itself make every use of
+		// the parameter nullable; explicit sqlc.narg still takes precedence.
 		return 60
 
 	case *ast.In:
