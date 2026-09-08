@@ -14,12 +14,8 @@ func addExtraGoStructTags(tags map[string]string, req *plugin.GenerateRequest, o
 		if oride.GoType.StructTags == nil {
 			continue
 		}
-		if overrideMatchesColumn(override, col) {
-			for k, v := range oride.GoType.StructTags {
-				tags[k] = v
-			}
-			continue
-		}
+		// Preserve column-scoped tags. Applying previously ignored db_type
+		// tags here would silently change JSON and shared cache payloads.
 		if !override.Matches(col.Table, req.Catalog.DefaultSchema) {
 			// Different table.
 			continue

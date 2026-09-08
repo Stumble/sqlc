@@ -42,6 +42,31 @@ func TestQualifiedBuiltinOverride(t *testing.T) {
 	}
 }
 
+func TestLegacyStructTagScope(t *testing.T) {
+	req := &plugin.GenerateRequest{
+		Catalog: &plugin.Catalog{DefaultSchema: "public"},
+		PluginOptions: []byte(`{"package":"books","sql_package":"wpgx","overrides":[
+			{"db_type":"pg_catalog.int8","go_struct_tag":"json:\"changed_id\""},
+			{"column":"books.title","go_struct_tag":"json:\"display_title\""}
+		]}`),
+	}
+	options, err := parseOptions(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ column, typ, want string }{
+		{"id", "int8", "id"},
+		{"title", "text", "display_title"},
+	} {
+		tags := map[string]string{"json": tc.column}
+		col := &plugin.Column{Name: tc.column, Table: &plugin.Identifier{Schema: "public", Name: "books"}, Type: &plugin.Identifier{Schema: "pg_catalog", Name: tc.typ}, NotNull: true}
+		addExtraGoStructTags(tags, req, options, col)
+		if tags["json"] != tc.want {
+			t.Errorf("%s JSON tag = %q, want %q", tc.column, tags["json"], tc.want)
+		}
+	}
+}
+
 func TestMissingGenerateRequest(t *testing.T) {
 	if _, err := Generate(context.Background(), nil); err == nil {
 		t.Fatal("expected missing request error")

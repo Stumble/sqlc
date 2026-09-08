@@ -76,12 +76,14 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 				continue
 			}
 			if c.wicked != nil {
-				if rel := wickedLayout(stmts[i]); rel != nil {
+				if wickedCreatesLayout(stmts[i]) {
 					layouts++
 					if layouts > 1 {
 						merr.Add(filename, contents, stmts[i].Pos(), fmt.Errorf("only one table creation is allowed per schema.sql file"))
 					}
-					if filename == c.wicked.PrimarySchemaPath && layouts == 1 {
+				}
+				if filename == c.wicked.PrimarySchemaPath && c.wicked.PrimaryRelation == nil {
+					if rel := wickedRelation(stmts[i]); rel != nil {
 						table, err := c.catalog.GetTable(rel)
 						if err != nil {
 							merr.Add(filename, contents, stmts[i].Pos(), err)

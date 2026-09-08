@@ -196,7 +196,7 @@ func buildImports(options *opts.Options, queries []Query, uses func(string) bool
 	}
 	_, overrideUUID := overrideTypes["uuid.UUID"]
 	if uses("uuid.UUID") && !overrideUUID {
-		pkg[ImportSpec{Path: "github.com/satori/go.uuid"}] = struct{}{}
+		pkg[ImportSpec{Path: "github.com/google/uuid"}] = struct{}{}
 	}
 	_, overrideNullUUID := overrideTypes["uuid.NullUUID"]
 	if uses("uuid.NullUUID") && !overrideNullUUID {

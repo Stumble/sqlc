@@ -19,6 +19,9 @@ func TestWickedSchemaOwnership(t *testing.T) {
 		invalid bool
 	}{
 		{"table", "CREATE TABLE orders (id bigint, book_id bigint);", "orders", false},
+		{"inherited", "CREATE TABLE orders () INHERITS (books);", "orders", false},
+		{"inherited_renamed", "CREATE TABLE initial () INHERITS (books); ALTER TABLE initial RENAME TO orders;", "orders", false},
+		{"empty_then_altered", "CREATE TABLE orders (); ALTER TABLE orders ADD COLUMN id bigint;", "orders", false},
 		{"renamed_table", "CREATE TABLE initial (id bigint); ALTER TABLE initial RENAME TO renamed;", "renamed", false},
 		{"materialized_view", "CREATE MATERIALIZED VIEW revenues AS SELECT id FROM books;", "revenues", false},
 		{"partition", "CREATE TABLE events (id bigint) PARTITION BY RANGE (id); CREATE TABLE events_small PARTITION OF events FOR VALUES FROM (0) TO (100);", "events", false},

@@ -85,12 +85,21 @@ For reproducible migration fixtures, CI builds with
 release. General compiler fixes are committed in this fork first and are only
 proposed upstream after the complete fork and downstream tests pass.
 
+Compatibility is checked against v2.3.4, including the full `github.com/google/uuid`
+type identity, inherited primary models, generated Row types, and JSON/cache
+payloads. In wpgx mode, `go_struct_tag` remains column-scoped; `db_type` overrides
+select Go types but do not change struct tags. Use a column override when a tag
+change is intended. `sqlc.narg()` explicitly requests a nullable parameter; a
+repeated parameter otherwise retains the legacy preference for comparisons over
+assignments. These rules do not constitute a full SQL nullability proof.
+
 Developer checks:
 
 ```bash
 make proto BUF='go run github.com/bufbuild/buf/cmd/buf@v1.72.0'
 go run ./scripts/test-local -- go test -count=1 -timeout 20m ./...
 make build-endtoend
+cd internal/endtoend/testdata && go test ./wicked_compat/go
 ```
 
 The local test runner owns temporary PostgreSQL/MySQL containers and uses random

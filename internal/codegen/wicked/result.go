@@ -377,6 +377,11 @@ var cmdReturnsData = map[string]struct{}{
 }
 
 func putOutColumns(query *plugin.Query) bool {
+	// Legacy wicked exposes Row structs even for exec queries with RETURNING.
+	// They are part of the generated Go API despite not being returned by exec.
+	if len(query.Columns) > 0 {
+		return true
+	}
 	_, found := cmdReturnsData[query.Cmd]
 	return found
 }

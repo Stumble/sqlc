@@ -283,8 +283,9 @@ Go 配置走标准 PluginOptions / GlobalOptions。backend 局部适配 legacy w
 - 已有评分语义：显式 cast/比较 100；算术/连接/LIKE/limit/offset 90；BETWEEN 75；IN 70；
   结果目标及 AND/OR 60；一般表达式/NOT 50；函数/其他布尔 40；空上下文与 NULL 判断低优先级。
   具体分支以旧补丁为迁移依据，并用真实 SQL 推导结果验证，不能用评分表本身作为全部测试断言。
-- 上游回归验证发现 INSERT/UPDATE 已绑定 relation 的赋值目标应同为 100；否则可能误选内层比较，
-  使重复表引用变成歧义并丢失参数名/nullability。已增加最小用例与原上游 managed-db 对照验证。
+- 初版曾把 INSERT/UPDATE 赋值目标提到 100 来规避重复表引用的歧义；下游审计证实这会无意改变 nullable。
+  复核后的修复恢复旧评分 60，在 resolveCatalogRefs 中仅去重重复的无别名 relation。
+  同一表跨 CTE/主语句不会再被重复计数；不同 alias 仍保留，真实 self-join 歧义不被掩盖。
 - 保留未编号参数的编号分配和 named/narg 的 nullability 信息；之后仍使用上游排序及 resolveCatalogRefs。
 - 不用 map 的迭代顺序决定参数顺序。复杂或互相矛盾的 SQL 类型约束继续遵循编译器已有诊断能力，
   该补丁不被描述为完整的约束求解器。
@@ -475,6 +476,9 @@ proto 生成、编译、必要的 gofmt 和 CI 既定检查仍需完成。bookst
 
 ### Result and review
 
+本小节记录首次发布时的验证；后续真实下游审计推翻了其中“B5/R5 已充分覆盖”的判断。
+最终以本文件末尾的 post-publication follow-up 和新验证结果为准，不把初版 CI 全绿当作全面兼容的证明。
+
 上游 v1.31.1 通过正常 merge 纳入；wicked 生成器位于独立包，按旧 wpgx 配置选择。
 前端保留 schema 约定和类型推导，元数据使用批准的 oneof 契约，comments 负责选项传递。
 通用参数推导补丁为独立 commit `c7f1ceb23`，没有向上游提前提交 PR。
@@ -548,3 +552,36 @@ Bookstore 的 `make test`、Go 1.25.7 与 Go 1.26.2 的 race suite、`make lint-
 参考：[Go security advisories](https://pkg.go.dev/vuln/GO-2026-6061)、
 [x/text advisory](https://pkg.go.dev/vuln/GO-2026-5970)、
 [Go release history](https://go.dev/doc/devel/release#go1.26.8)。
+
+### Post-publication compatibility follow-up
+
+用户要求扩大旧版本对照，随后授权修改当前 PR，并用新 binary 验证 Alva mono repo；允许少量有依据的改进。
+这轮使用追加 commits，不重写已推送历史，不修改 Alva 原工作区、业务代码或生产数据库。
+
+审计确认的修复/取舍：
+
+- A1：恢复 google/uuid，增加实际 import/类型身份及 nullable UUID 的编译断言。
+- A2：恢复旧参数上下文评分，修复重复无别名表的假歧义；保留 nullable 赋值、narg 及真实 self-join 的含义。
+- A3：主模型候选与新布局计数分开；继承表、空 CREATE 后 ALTER、重命名及分区继续保留。
+- A4：Docker release 使用 info.Version，与 make build、CLI 和生成文件版本一致；新增实际二进制测试。
+- A5：保留 exec + RETURNING 曾导出的 Row 类型；不在迁移中顺带删除公共 Go 类型。
+- A6：保留旧 column-only struct tags，避免默认启用 db_type tags 后改变 JSON/共享缓存格式。
+- 保留合理改善：接口签名修正、局部变量冲突修正、CopyFrom 原始列名、内建类型识别；不为了逐字一致恢复已证实旧缺陷。
+
+新的 wicked_compat fixture 来自 v2.3.4 的相同 SQL/config 生成结果，覆盖继承模型、Google UUID、Row API 和 JSON tags。
+测试对旧 JSON payload 进行实际编解码，CI 编译消费者；不再只比较类型名称字符串。
+参数编译器测试先验证旧签名回归及重复 relation 假歧义均失败，再修复；发布测试实际构建并运行二进制。
+
+完整上游测试发现 insert_select_param 之前只在 managed-db 模式下测试：官方 v1.31.1 本地 compile
+对合法的 INSERT … SELECT FROM 同表错误报告 name 歧义，数据库 fallback 丢失了静态参数 nullability。
+新去重逻辑让本地分析成功，参数成为非空 int64/string；已将该 fixture 扩为 base + managed-db，
+使用生成器更新其输出并核对仅移除 pgtype 导入、两个字段类型变化。这是有独立证据的通用修正，
+不是为了让失败测试通过而回避差异；Alva 218 组输入与旧 v2.3.4 生成结果仍一致。
+
+执行清单（本次最终证据将补在此处）：
+
+- [x] 修复 A1–A6 并加入针对性回归。
+- [ ] 重新执行完整上游测试、fixture 编译/编解码和 bookstore 数据库/race 验证。
+- [ ] 在隔离副本重新生成 Alva mono repo 的全部 wpgx 配置，逐项审阅差异并编译真实消费者。
+- [ ] 重跑双版本矩阵，归类少量合理差异，复核完整 net diff。
+- [ ] 追加提交、更新 PR 说明、等待当前 HEAD 的 CI 和反馈收敛。

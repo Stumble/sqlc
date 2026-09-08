@@ -14,6 +14,9 @@ jobs:
         with:
           go-version-file: go.mod
       - run: make build COMMIT_HASH=v2.4.0-dev
+      - name: Check generated consumer and JSON contracts
+        working-directory: internal/endtoend/testdata
+        run: go test ./wicked_compat/go
       - uses: actions/checkout@v6
         with:
           repository: Stumble/bookstore

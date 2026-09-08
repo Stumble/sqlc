@@ -32,7 +32,7 @@ func main() {
 	}
 
 	if *docker {
-		x := "-extldflags \"-static\" -X github.com/sqlc-dev/sqlc/internal/cmd.version=" + version
+		x := releaseLDFlags(version)
 		args := []string{
 			"build",
 			"-a",
@@ -56,4 +56,9 @@ func main() {
 	}
 
 	log.Fatal("publishing to Equinox has been disabled")
+}
+
+func releaseLDFlags(version string) string {
+	// The CLI and generated headers must use the same version, as in make build.
+	return "-extldflags \"-static\" -X github.com/sqlc-dev/sqlc/internal/info.Version=" + version
 }
