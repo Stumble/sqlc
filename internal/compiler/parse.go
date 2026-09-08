@@ -193,28 +193,134 @@ func rangeVars(root ast.Node) []*ast.RangeVar {
 	return vars
 }
 
-func uniqueParamRefs(in []paramRef, dollar bool) []paramRef {
-	m := make(map[int]bool, len(in))
-	o := make([]paramRef, 0, len(in))
-	for _, v := range in {
-		if !m[v.ref.Number] {
-			m[v.ref.Number] = true
-			if v.ref.Number != 0 {
-				o = append(o, v)
+// scoreParamRefForTypeInference scores a parameter reference based on how good
+// its context is for type inference. Higher scores indicate better contexts.
+func scoreParamRefForTypeInference(ref paramRef) int {
+	if ref.parent == nil {
+		return 0 // No context
+	}
+
+	switch parent := ref.parent.(type) {
+	case *ast.TypeCast:
+		// Explicit type cast - excellent for type inference
+		return 100
+
+	case *ast.A_Expr:
+		// Expression context - quality depends on the operator
+		if parent.Name != nil && len(parent.Name.Items) > 0 {
+			if nameStr, ok := parent.Name.Items[0].(*ast.String); ok {
+				switch nameStr.Str {
+				case "=", "==", "!=", "<>", "<", "<=", ">", ">=":
+					// Comparison operations - very good for type inference
+					return 100
+				case "+", "-", "*", "/", "%":
+					// Mathematical operations - good for type inference
+					return 90
+				case "||":
+					// String concatenation - good for type inference
+					return 90
+				case "~~", "!~~", "~~*", "!~~*":
+					// LIKE operations - good for type inference
+					return 90
+				case "IS", "IS NOT":
+					// IS NULL/IS NOT NULL - poor for type inference
+					return 0
+				default:
+					return 50
+				}
 			}
+		}
+		return 50 // Default for A_Expr without clear operator
+
+	case *ast.BoolExpr:
+		// Boolean expressions
+		switch parent.Boolop {
+		case ast.BoolExprTypeAnd, ast.BoolExprTypeOr:
+			// Logical operations - still useful but lower priority
+			return 60
+		case ast.BoolExprTypeIsNull, ast.BoolExprTypeIsNotNull:
+			// IS NULL/IS NOT NULL - poor for type inference
+			return 20
+		case ast.BoolExprTypeNot:
+			// NOT operations - moderate for type inference
+			return 50
+		default:
+			return 40
+		}
+
+	case *ast.BetweenExpr:
+		// BETWEEN expressions - good for type inference
+		return 75
+
+	case *ast.FuncCall:
+		// Function call context - depends on function, generally moderate
+		// sqlc.narg() and similar functions have poor type inference context
+		if parent.Funcname != nil && len(parent.Funcname.Items) > 0 {
+			if nameStr, ok := parent.Funcname.Items[0].(*ast.String); ok {
+				if nameStr.Str == "sqlc.narg" || nameStr.Str == "sqlc.arg" {
+					// sqlc parameter functions in isolation - poor for type inference
+					return 30
+				}
+			}
+		}
+		return 40
+
+	case *ast.ResTarget:
+		// INSERT/UPDATE assignment targets identify their relation directly.
+		// Keep that binding ahead of an equally informative comparison in a
+		// nested query, where an unqualified column can be ambiguous.
+		if ref.rv != nil {
+			return 100
+		}
+		// SELECT target or similar - can be good for type inference
+		return 60
+
+	case *ast.In:
+		// IN expression - good for type inference
+		return 70
+
+	case *limitCount, *limitOffset:
+		// LIMIT/OFFSET - known to be integer, good for type inference
+		return 90
+
+	default:
+		// Unknown context - assign low score
+		return 10
+	}
+}
+
+func uniqueParamRefs(in []paramRef, dollar bool) []paramRef {
+	positions := make(map[int]int, len(in))
+	out := make([]paramRef, 0, len(in))
+	for _, ref := range in {
+		if ref.ref.Number == 0 {
+			continue
+		}
+		if index, ok := positions[ref.ref.Number]; ok {
+			if scoreParamRefForTypeInference(ref) > scoreParamRefForTypeInference(out[index]) {
+				out[index] = ref
+			}
+		} else {
+			positions[ref.ref.Number] = len(out)
+			out = append(out, ref)
 		}
 	}
 	if !dollar {
-		start := 1
-		for _, v := range in {
-			if v.ref.Number == 0 {
-				for m[start] {
-					start++
-				}
-				v.ref.Number = start
-				o = append(o, v)
+		next := 1
+		for _, ref := range in {
+			if ref.ref.Number != 0 {
+				continue
 			}
+			for {
+				if _, used := positions[next]; !used {
+					break
+				}
+				next++
+			}
+			ref.ref.Number = next
+			positions[next] = len(out)
+			out = append(out, ref)
 		}
 	}
-	return o
+	return out
 }
