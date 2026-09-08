@@ -581,7 +581,41 @@ Bookstore 的 `make test`、Go 1.25.7 与 Go 1.26.2 的 race suite、`make lint-
 执行清单（本次最终证据将补在此处）：
 
 - [x] 修复 A1–A6 并加入针对性回归。
-- [ ] 重新执行完整上游测试、fixture 编译/编解码和 bookstore 数据库/race 验证。
-- [ ] 在隔离副本重新生成 Alva mono repo 的全部 wpgx 配置，逐项审阅差异并编译真实消费者。
-- [ ] 重跑双版本矩阵，归类少量合理差异，复核完整 net diff。
-- [ ] 追加提交、更新 PR 说明、等待当前 HEAD 的 CI 和反馈收敛。
+- [x] 重新执行完整上游测试、fixture 编译/编解码和 bookstore 数据库/race 验证。
+- [x] 在隔离副本重新生成 mono repo 的全部 wpgx 配置，逐项审阅差异并验证真实消费者（trex 全量本地编译限制见下）。
+- [x] 重跑双版本矩阵，归类少量合理差异，复核完整 net diff。
+
+发布沿用 sqlc #16 与 bookstore #2；当前 HEAD 的 CI 和审查反馈状态以 PR 页面为准，不自动合并。
+
+#### Final follow-up evidence
+
+修复提交：`cead568ed`（通用 compiler）与 `62d9e5b26`（wicked/release 兼容性）。
+最终 net diff 已按行为、职责边界、测试、数据兼容、构建和文档重新审阅；默认 Go backend 保持 upstream v1.31.1 源码。
+
+sqlc 工作目录 `/home/forge/sqlc`：
+
+- `make build COMMIT_HASH=v2.4.0-dev`，最终二进制从干净 `62d9e5b26` 构建。
+- CGO 与非 CGO 的 compiler/cmd/wicked/config `go test -count=1` 均通过。
+- `GOMAXPROCS=2 PATH=/home/forge/sqlc/bin:$PATH go run ./scripts/test-local -- go test -p 2 -parallel 8 -count=1 -tags=examples -timeout 20m ./...` 全部通过；endtoend 144.467s，含 base/managed-db、SQLite/MySQL/PostgreSQL、插件及新 fixture。
+- `GOTOOLCHAIN=go1.26.8 make build-endtoend` 通过；testdata module 中 `go test -count=1 ./wicked_compat/go` 通过。
+- `CGO_ENABLED=0 go build -ldflags='-X github.com/sqlc-dev/sqlc/internal/info.Version=v2.4.0-dev-wicked-fork' -o bin/sqlc-nocgo ./cmd/sqlc` 通过；该 binary 的 bookstore `diff` 通过。
+- `GOMEMLIMIT=1GiB GOMAXPROCS=2 go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...`：0 个可达漏洞；另有未调用到的导入包/模块公告。
+- 按 PR base 扫描全部新增提交：未发现凭据；本轮没有 proto 修改，协议 round-trip/标准请求测试随全套重新通过。
+
+bookstore 工作目录 `/home/forge/bookstore`：新 binary 的 `make sqlc`、`make sqlc-verify` 和 `git diff --exit-code -- pkg/repos` 均通过，17 个输出无需更新。
+`GOFLAGS=-count=1 make test` 通过（8.690s）；Go 1.25.7 race suite 通过（11.851s），Go 1.26.8 race suite 通过（13.768s）；`make lint-fix` 为 0 issues。
+
+消费者在 `/tmp/sqlc-mono-validation.regHRh/{baseline,current}` 的独立副本中验证：
+
+- 扫描覆盖 8 个仓库、226 组 wpgx 配置；689 个本次生成的 Go 文件与同输入 v2.3.4 产物仅版本注释不同。
+- alva-backend、jagent、alfs、connectors、llm-data、synthdb、forge 的全量 Go 编译通过；go.work 中的本地模块使用明确的 `./path/...` 一起编译。jagent 按其 AGENTS.md 使用 Clang 21 与 `CGO_CXXFLAGS=-nostdinc++`。
+- trex 的 36 个新生成文件与当前已提交文件也仅版本注释不同；`go build -p 1 ./internal/repos/...` 通过。其同一源码提交 `56027c847620d0a16285ed4d1736301ac1980e99` 的 CI、lint 和镜像构建已确认成功。
+- **验证限制：** trex 完整本地构建的 CCXT 第三方包超过本环境内存软限制。默认构建及限制优化/并发的诊断尝试均已取消；不计为通过。采用本地生成包编译、源代码等价对照与同源码既有 CI 证据；未修改依赖版本、业务代码或提高宿主机限额。
+- 与更老的已提交生成代码相比，差异为旧 fork 已有的 nil-cache/并发失效修复，以及一处手写生成 wrapper 的等价模板化；均已审阅。原 mono repo 工作区及其子模块改动完整保留，没有提交消费者生成文件。
+
+双版本矩阵 147 组：113 组生成成功且仅版本注释不同，23 组为已解释的接口/变量冲突/CopyFrom/内建类型识别改善；另有 3 组旧版可生成但无法编译的 batch、3 组新版修复的关键字输入、5 组两版均拒绝的非法 CopyFrom。
+成功生成案例的编译结果已单独分类，没有新引入的“旧包可编译、新包不可编译”；没有把旧版本本来失败的组合计为新回归。
+
+资源诊断记录：并行 CCXT 构建引起 cgroup memory.high 压力，期间 bookstore 短 deadline 与一次上游 20m 测试超时；安全扫描亦主动终止。
+停止重型编译后，未修改 SQL timeout、生产代码或测试期望，重新执行得到上述完整通过结果。所有本次测试容器均清理。
+未运行完整 Alva 服务栈/生产数据库；这次的运行时 E2E 边界仍是已批准的 CLI → bookstore → 自有 PostgreSQL/Redis。
