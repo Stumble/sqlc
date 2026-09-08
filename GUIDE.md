@@ -18,7 +18,7 @@ as this combo.
 
 Production versions:
 
-+ sqlc: v2.3.0-wicked-fork
++ sqlc: v2.3.4-wicked-fork
 + dcache: v0.3.0 (Note: redis/v8 users please use v0.1.4)
 + wgpx: v0.3.1
 
@@ -54,11 +54,49 @@ your customers are disappointed, or (2) before the product is launched, writing 
 # cgo must be enabled because: https://github.com/pganalyze/pg_query_go
 git clone https://github.com/Stumble/sqlc.git
 cd sqlc/
-git checkout v2.3.0
+git checkout v2.3.4
 make install
 sqlc version
-# you shall see: v2.3.0-wicked-fork
+# you shall see: v2.3.4-wicked-fork
 ```
+
+### Upstream synchronization development
+
+The migration branch integrates upstream **v1.31.1**. It uses Go 1.26.2 (the Go
+toolchain can select this automatically) and keeps the same `make install`,
+`sqlc generate`, `sqlc diff`, and `sql_package: wpgx` entrypoints. It is a single
+executable; no additional codegen plugin needs to be installed.
+
+```bash
+git checkout refactor/upstream-sync
+make install
+# The upstream parser also supports builds without CGO:
+make build CGO_ENABLED=0
+```
+
+The compiler handles schema dependencies, the primary model, and SQL types.
+`internal/codegen/wicked` owns the Go mapping, templates, comment options, cache
+keys, timeouts, invalidation, and replica APIs. Standard Go generation remains
+in the upstream backend. Wicked facts are transported in `WickedMetadata`;
+`-- -- key: value` options use the standard query comments.
+
+For reproducible migration fixtures, CI builds with
+`make build COMMIT_HASH=v2.4.0-dev`. This development label is not a published
+release. General compiler fixes are committed in this fork first and are only
+proposed upstream after the complete fork and downstream tests pass.
+
+Developer checks:
+
+```bash
+make proto BUF='go run github.com/bufbuild/buf/cmd/buf@v1.72.0'
+go run ./scripts/test-local -- go test -count=1 -timeout 20m ./...
+make build-endtoend
+```
+
+The local test runner owns temporary PostgreSQL/MySQL containers and uses random
+ports. The bookstore test suite similarly owns its PostgreSQL/Redis containers;
+it must not reuse a shared database or Redis server. The migration preserves
+existing runtime dependencies in the example.
 
 ## Getting started
 
@@ -115,7 +153,8 @@ each **logical** table in DB. To be more clear:
 + 1 schema file for 1 normal physical table.
 + For **Declarative Partitioning**, the table declaration and all its partitions can be, and should
   be placed into one schema file, as they are logically one table.
-+ For **(Materialized) View**, one schema file per view is required.
++ For a **Materialized View**, one schema file per view is required. Ordinary
+  `CREATE VIEW` is currently not supported as the primary wicked model.
 
 You can and you should list all the **constraints and indexes** in the schema file. In the future,
 we might have some static analyze tool to check for slow queries. Also, listing them here will
@@ -369,7 +408,12 @@ We support heterogeneous database replicas, meaning that you can not only use ph
 the primary instance, but also logical replicas that may have different schema, like additional materialzied views, plugins,
 or only some part of the table.
 
-Replicas are managed by the wpgx pool object. We enforce that read replicas are "read-only" on the SQL level.
+Replicas are managed by the wpgx pool object. `ReadOnlyQueries` exposes eligible
+`:one`/`:many` queries classified as top-level SELECT statements. Set
+`-- -- allow_replica: false` to omit a query from this API. This preserves the
+existing classification; it does not prove that a SELECT has no writing CTE,
+row lock, or function side effect. Use read-only database permissions for replica
+connections, and choose replica access according to the query's consistency needs.
 
 Example:
 
@@ -437,6 +481,12 @@ TBD: How the invalidate option support this feature and how it works in Transact
   impossible to be inferred.
 
 #### Known issues
+
++ Wicked `:batch*` and `:execlastid` commands are not supported and now fail
+  generation explicitly. `:copyfrom` remains supported; its template applies the
+  timeout but does not implement cache/invalidate options.
++ Experimental database-only analysis cannot provide the primary wicked model
+  and is rejected. Ordinary upstream generation keeps its own behavior.
 
 + `from unnest(array1, arry2)` is not supported yet. Use `select unnest(array1), unnest(array1)` instead.
   Note, when the arrays are not all the same length then the shorter ones are padded with NULLs.

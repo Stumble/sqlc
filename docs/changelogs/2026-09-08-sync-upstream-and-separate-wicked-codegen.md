@@ -11,8 +11,8 @@
 先完成 fork 的实现及整体验证，确认自己的整套流程可用后，再整理通用补丁向上游提交 PR。
 上游是否接收不阻塞本次迁移。
 
-目标仍是保持现有下游的安装、配置、SQL 和业务调用习惯。现阶段记录的是架构决定；
-尚未完成实现设计、产品代码迁移或生成代码的运行验证。
+目标仍是保持现有下游的安装、配置、SQL 和业务调用习惯。以下保留批准的架构和实现设计，
+实施结果、验证证据和已知限制见第 7-8 节。
 
 ### Verified implementation and history
 
@@ -283,6 +283,8 @@ Go 配置走标准 PluginOptions / GlobalOptions。backend 局部适配 legacy w
 - 已有评分语义：显式 cast/比较 100；算术/连接/LIKE/limit/offset 90；BETWEEN 75；IN 70；
   结果目标及 AND/OR 60；一般表达式/NOT 50；函数/其他布尔 40；空上下文与 NULL 判断低优先级。
   具体分支以旧补丁为迁移依据，并用真实 SQL 推导结果验证，不能用评分表本身作为全部测试断言。
+- 上游回归验证发现 INSERT/UPDATE 已绑定 relation 的赋值目标应同为 100；否则可能误选内层比较，
+  使重复表引用变成歧义并丢失参数名/nullability。已增加最小用例与原上游 managed-db 对照验证。
 - 保留未编号参数的编号分配和 named/narg 的 nullability 信息；之后仍使用上游排序及 resolveCatalogRefs。
 - 不用 map 的迭代顺序决定参数顺序。复杂或互相矛盾的 SQL 类型约束继续遵循编译器已有诊断能力，
   该补丁不被描述为完整的约束求解器。
@@ -335,14 +337,14 @@ Go 配置走标准 PluginOptions / GlobalOptions。backend 局部适配 legacy w
 
 ### Serial Implementation Checklist
 
-- [ ] 保存并审阅 v2.3.4 对照产物，建立生成签名/cache-key/运行行为 fixtures（B1/B5/B6；结构检查与基线）。
-- [ ] 将 v1.31.1 纳入工作分支，按新接口独立迁移 wicked backend，恢复构建和普通生成路径（B1/D1/D3/D6；沿用上游测试）。
-- [ ] 定义并生成 WickedMetadata，接入主 schema/主对象和 query_is_select，完成 scoped dispatch（B2/B4/F1/F5；契约与 CLI 测试）。
-- [ ] 独立移植通用参数引用修复，用真实 SQL 推导回归验证后形成独立 commit（B7/F3/D2/D8；test-first）。
-- [ ] 完成注释选项、类型/模板、失效签名与 key、helper 的迁移，逐项对照基线（B3/B5/B6/F2/F4；测试与迁移并行）。
-- [ ] 在 bookstore 增加本地 changelog、隔离 testenv 和运行回归，重生成并审阅样例及必要 goldens（B1/B5/B6；回归 test-first）。
-- [ ] 更新 GUIDE、构建/安装/proto 和 CI，运行第 5 节检查，记录结果并审阅完整 diff（所有 B/F/R；现有覆盖加新增回归）。
-- [ ] 完成自己的 fork 全部 commits 与整体验证后，再整理通用补丁的上游 PR；未通过验证前不提交上游 PR（D8）。
+- [x] 保存并审阅 v2.3.4 对照产物，建立生成签名/cache-key/运行行为 fixtures（B1/B5/B6；结构检查与基线）。
+- [x] 将 v1.31.1 纳入工作分支，按新接口独立迁移 wicked backend，恢复构建和普通生成路径（B1/D1/D3/D6；沿用上游测试）。
+- [x] 定义并生成 WickedMetadata，接入主 schema/主对象和 query_is_select，完成 scoped dispatch（B2/B4/F1/F5；契约与 CLI 测试）。
+- [x] 独立移植通用参数引用修复，用真实 SQL 推导回归验证后形成独立 commit（B7/F3/D2/D8；test-first）。
+- [x] 完成注释选项、类型/模板、失效签名与 key、helper 的迁移，逐项对照基线（B3/B5/B6/F2/F4；测试与迁移并行）。
+- [x] 在 bookstore 增加本地 changelog、隔离 testenv 和运行回归，重生成并审阅样例及必要 goldens（B1/B5/B6；回归 test-first）。
+- [x] 更新 GUIDE、构建/安装/proto 和 CI，运行第 5 节检查，记录结果并审阅完整 diff（所有 B/F/R；现有覆盖加新增回归）。
+- [x] 完成自己的 fork 全部补丁与整体验证，保留独立通用修复；上游 PR 为验证完成后的独立后续工作（D8）。
 
 ## 5. Verification and E2E Design
 
@@ -467,3 +469,62 @@ proto 生成、编译、必要的 gofmt 和 CI 既定检查仍需完成。bookst
 - 用户已批准本代码级计划，并授权连续完成实现、验证、自己的 fork push 和 PR 后汇报。
 - 执行基线：上游 v1.31.1、同一二进制内的独立 backend、保留现有副本判断，bookstore 为运行验证样例。
 - 通用修复继续先提交在自己的 fork；上游贡献遵守 D8 的整体验证前置条件。
+
+## 7. Outcome and Evidence
+
+### Result and review
+
+上游 v1.31.1 通过正常 merge 纳入；wicked 生成器位于独立包，按旧 wpgx 配置选择。
+前端保留 schema 约定和类型推导，元数据使用批准的 oneof 契约，comments 负责选项传递。
+通用参数推导补丁为独立 commit `c7f1ceb23`，没有向上游提前提交 PR。
+
+按行为、架构、测试、数据/兼容、运维和文档检查了本次自有差异；上游导入部分与 v1.31.1 tag 对齐。
+检查并修复了以下问题，之后重新执行对应测试与最终完整验证：
+
+- 赋值目标的参数绑定优先级，避免 INSERT … SELECT + CTE 在 managed-db 模式下丢失参数信息。
+- 新版 pg_catalog 类型限定与旧 JSON/UUID 等 Go 类型映射，以及 db_type overrides 的匹配。
+- Go options 解析保留 Catalog 上下文，防止列 override panic；保持局部 rename 优先和旧 override 顺序。
+- 主表身份跟随后续 ALTER/RENAME，再生成最终的规范化标识。
+- emit_interface 的返回指针与 invalidate 参数签名；有生成 fixture 和编译检查。
+- 版本信息改为可通过原 Makefile 链接参数设置，保留 wicked 标识。
+
+| IDs | Result | Evidence |
+|-----|--------|----------|
+| B1, D1/D3/D6 | DONE | 原 bookstore YAML、单二进制、普通 Go/JSON/插件测试、CGO/非 CGO 构建 |
+| B2, F1/F5 | DONE | 普通表、分区、物化视图、重命名、错误布局、主源保存 tests |
+| B3, F2 | DONE | 注释选项、重复键、时长/未知选项/失效目标验证、缺 timeout CLI fixture |
+| B4, F4, D4/D5 | DONE | QueryIsSelect、INSERT RETURNING 方法集、proto round-trip、普通 JSON 无额外字段 |
+| B5 | DONE | bookstore 42 条查询的 17 个 Go 文件与相同输入的 v2.3.4 产物仅版本注释不同 |
+| B6 | DONE | 实际 PostgreSQL/Redis 的缓存、提交/回滚、失效、nil cache、JSON、copyfrom、timeout、replica tests |
+| B7, F3, D2/D8 | DONE | 独立 commit、nullable 参数和赋值绑定 tests、原上游对照、完整上游测试 |
+| R1/R2/R4/R5/R6/R7 | Resolved for this migration | 已明确基线、契约、算法修复、样例覆盖和主模型范围；没有新增主键产品能力 |
+| R3 | Retained limitation | 保持原 SELECT 分类；不声称能证明任意 SQL 完整只读 |
+
+### Final local verification
+
+工作目录 `/home/forge/sqlc`，下列检查均已通过：
+
+- `make build COMMIT_HASH=v2.4.0-dev`。
+- `go test -count=1 ./internal/compiler ./internal/cmd ./internal/codegen/wicked ./internal/config`。
+- `PATH=/home/forge/sqlc/bin:$PATH go run ./scripts/test-local -- go test -count=1 -timeout 20m ./...`。
+- `PATH=/home/forge/sqlc/bin:$PATH go run ./scripts/test-local -- go test -count=1 -tags=examples -timeout 20m ./...`，
+  含上游全部数据库/生成测试；最终 internal/endtoend 用时约 148 秒，PG/MySQL 使用本次专属容器。
+- `make build-endtoend`，含新增 wicked 主模型/interface fixture。
+- `CGO_ENABLED=0 go build -ldflags='-X github.com/sqlc-dev/sqlc/internal/info.Version=v2.4.0-dev-wicked-fork' -o bin/sqlc-nocgo ./cmd/sqlc`。
+- `bin/sqlc-nocgo diff -f /home/forge/bookstore/pkg/repos/sqlc.yaml`，通过。
+- `make proto BUF='go run github.com/bufbuild/buf/cmd/buf@v1.72.0'`，重复生成无额外差异；Buf lint 通过。
+- git diff whitespace 检查与提交范围/暂存区凭据扫描通过。sqlc 没有 make lint-fix，未另造 lint 命令；
+  Buf 自身的 schema 检查与 Go 编译/测试照常执行。
+
+Bookstore 的 `make test`、Go 1.25.7 与 Go 1.26.2 的 race suite、`make lint-fix` 和生成 diff 全部通过。
+14 个 suite 用例及两个 search 子用例使用真实 PostgreSQL/Redis；详情见其本地 changelog。
+三处 JSON golden 的变化属于已有 v2.3.4 RawMessage 行为，已逐个检查。
+未运行生产数据库或完整 Alva 服务栈，因为本次明确验证的是 CLI → Go → 数据库/缓存链路。
+
+## 8. Remaining Work
+
+- 发布自己的 fork 与 bookstore 配套 PR 并监控 CI；不自动合并或发布 release。
+- 在自己的整套验证通过的基础上，独立整理通用类型推导补丁的上游 PR。
+- 已保留的限制：顶层 SELECT 分类不等于完整只读证明；ordinary view 不能作为 wicked 主模型；
+  wicked batch/execlastid 和 database-only 分析不支持；copyfrom 不实现 cache/invalidate 选项。
+- 样例 replica 用例验证 API/连接选择，不模拟物理复制延迟；wpgx/dcache 运行时版本未升级。

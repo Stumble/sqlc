@@ -1,10 +1,15 @@
+BUF ?= buf
+CGO_ENABLED ?= 1
+COMMIT_HASH := $(shell git describe --tags --always --dirty)
+LDFLAGS := -X github.com/sqlc-dev/sqlc/internal/info.Version=$(COMMIT_HASH)-wicked-fork
+
 .PHONY: build build-endtoend test test-ci test-examples test-endtoend start psql mysqlsh proto
 
 build:
-	go build ./...
+	CGO_ENABLED=$(CGO_ENABLED) go build -ldflags="$(LDFLAGS)" -o bin/ ./cmd/...
 
 install:
-	go install ./...
+	CGO_ENABLED=$(CGO_ENABLED) go install -ldflags="$(LDFLAGS)" ./cmd/...
 
 test:
 	go test ./...
@@ -48,7 +53,7 @@ mysqlsh:
 	mysqlsh --sql --user root --password mysecretpassword --database dinotest 127.0.0.1:3306
 
 proto:
-	buf generate
+	$(BUF) generate
 
 remote-proto:
 	protoc \

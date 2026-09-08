@@ -6,6 +6,7 @@ import (
 	"github.com/sqlc-dev/sqlc/internal/config/convert"
 	"github.com/sqlc-dev/sqlc/internal/info"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
+	"github.com/sqlc-dev/sqlc/internal/sql/ast"
 	"github.com/sqlc-dev/sqlc/internal/sql/catalog"
 )
 
@@ -224,10 +225,25 @@ func pluginQueryParam(p compiler.Parameter) *plugin.Parameter {
 }
 
 func codeGenRequest(r *compiler.Result, settings config.CombinedSettings) *plugin.GenerateRequest {
-	return &plugin.GenerateRequest{
+	req := &plugin.GenerateRequest{
 		Settings:    pluginSettings(r, settings),
 		Catalog:     pluginCatalog(r.Catalog),
 		Queries:     pluginQueries(r),
 		SqlcVersion: info.Version,
 	}
+	if r.Wicked != nil {
+		rel := r.Wicked.PrimaryRelation
+		facts := &plugin.WickedMetadata{
+			PrimarySchemaPath: r.Wicked.PrimarySchemaPath,
+			PrimarySchemaSql:  r.Wicked.PrimarySchemaSQL,
+			PrimaryRelation:   &plugin.Identifier{Catalog: rel.Catalog, Schema: rel.Schema, Name: rel.Name},
+			QueryIsSelect:     make(map[string]bool, len(r.Queries)),
+		}
+		for _, q := range r.Queries {
+			_, isSelect := q.RawStmt.Stmt.(*ast.SelectStmt)
+			facts.QueryIsSelect[q.Metadata.Name] = isSelect
+		}
+		req.BackendMetadata = &plugin.GenerateRequest_Wicked{Wicked: facts}
+	}
+	return req
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sqlc-dev/sqlc/internal/migrations"
@@ -31,6 +32,16 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 	if err != nil {
 		return err
 	}
+	if c.conf.IsWicked() {
+		if c.databaseOnlyMode {
+			return fmt.Errorf("wicked requires schema-based analysis to identify the primary model")
+		}
+		if len(files) == 0 {
+			return fmt.Errorf("wicked requires a primary schema file")
+		}
+		c.wicked = &WickedSchema{PrimarySchemaPath: files[0]}
+		slices.Reverse(files)
+	}
 	merr := multierr.New()
 	for _, filename := range files {
 		blob, err := os.ReadFile(filename)
@@ -39,6 +50,9 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 			continue
 		}
 		contents := migrations.RemoveRollbackStatements(string(blob))
+		if c.wicked != nil && filename == c.wicked.PrimarySchemaPath {
+			c.wicked.PrimarySchemaSQL = contents
+		}
 		contents = migrations.RemovePsqlMetaCommands(contents)
 		c.schema = append(c.schema, contents)
 
@@ -55,15 +69,43 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 			continue
 		}
 
+		layouts := 0
 		for i := range stmts {
 			if err := c.catalog.Update(stmts[i], c); err != nil {
 				merr.Add(filename, contents, stmts[i].Pos(), err)
 				continue
 			}
+			if c.wicked != nil {
+				if rel := wickedLayout(stmts[i]); rel != nil {
+					layouts++
+					if layouts > 1 {
+						merr.Add(filename, contents, stmts[i].Pos(), fmt.Errorf("only one table creation is allowed per schema.sql file"))
+					}
+					if filename == c.wicked.PrimarySchemaPath && layouts == 1 {
+						table, err := c.catalog.GetTable(rel)
+						if err != nil {
+							merr.Add(filename, contents, stmts[i].Pos(), err)
+							continue
+						}
+						// Track catalog identity through subsequent ALTER/RENAME.
+						c.wicked.PrimaryRelation = table.Rel
+					}
+				}
+			}
 		}
 	}
 	if len(merr.Errs()) > 0 {
 		return merr
+	}
+	if c.wicked != nil && c.wicked.PrimaryRelation == nil {
+		return fmt.Errorf("wicked: primary schema %q has no supported table layout", c.wicked.PrimarySchemaPath)
+	}
+	if c.wicked != nil {
+		identity := *c.wicked.PrimaryRelation
+		if identity.Schema == "" {
+			identity.Schema = c.catalog.DefaultSchema
+		}
+		c.wicked.PrimaryRelation = &identity
 	}
 	return nil
 }
@@ -137,5 +179,6 @@ func (c *Compiler) parseQueries(o opts.Parser) (*Result, error) {
 	return &Result{
 		Catalog: c.catalog,
 		Queries: q,
+		Wicked:  c.wicked,
 	}, nil
 }

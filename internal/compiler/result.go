@@ -7,4 +7,5 @@ import (
 type Result struct {
 	Catalog *catalog.Catalog
 	Queries []*Query
+	Wicked  *WickedSchema
 }
