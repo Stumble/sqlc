@@ -1,6 +1,3 @@
-CREATE TABLE foo (a text, b text);
-CREATE TABLE bar (a text, b text);
-
 -- name: SelectUnion :many
 SELECT * FROM foo
 UNION
@@ -26,3 +23,8 @@ SELECT * FROM foo;
 SELECT * FROM foo
 UNION
 SELECT * FROM bar;
+
+-- name: SelectUnionAliased :many
+(SELECT * FROM foo)
+UNION
+SELECT * FROM foo;

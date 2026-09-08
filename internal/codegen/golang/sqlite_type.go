@@ -4,20 +4,25 @@ import (
 	"log"
 	"strings"
 
+	"github.com/sqlc-dev/sqlc/internal/codegen/golang/opts"
 	"github.com/sqlc-dev/sqlc/internal/codegen/sdk"
 	"github.com/sqlc-dev/sqlc/internal/debug"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
 )
 
-func sqliteType(req *plugin.CodeGenRequest, col *plugin.Column) string {
+func sqliteType(req *plugin.GenerateRequest, options *opts.Options, col *plugin.Column) string {
 	dt := strings.ToLower(sdk.DataType(col.Type))
 	notNull := col.NotNull || col.IsArray
+	emitPointersForNull := options.EmitPointersForNullTypes
 
 	switch dt {
 
 	case "int", "integer", "tinyint", "smallint", "mediumint", "bigint", "unsignedbigint", "int2", "int8":
 		if notNull {
 			return "int64"
+		}
+		if emitPointersForNull {
+			return "*int64"
 		}
 		return "sql.NullInt64"
 
@@ -28,11 +33,17 @@ func sqliteType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 		if notNull {
 			return "float64"
 		}
+		if emitPointersForNull {
+			return "*float64"
+		}
 		return "sql.NullFloat64"
 
 	case "boolean", "bool":
 		if notNull {
 			return "bool"
+		}
+		if emitPointersForNull {
+			return "*bool"
 		}
 		return "sql.NullBool"
 
@@ -40,7 +51,13 @@ func sqliteType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 		if notNull {
 			return "time.Time"
 		}
+		if emitPointersForNull {
+			return "*time.Time"
+		}
 		return "sql.NullTime"
+
+	case "json", "jsonb":
+		return "json.RawMessage"
 
 	case "any":
 		return "interface{}"
@@ -60,11 +77,17 @@ func sqliteType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 		if notNull {
 			return "string"
 		}
+		if emitPointersForNull {
+			return "*string"
+		}
 		return "sql.NullString"
 
 	case strings.HasPrefix(dt, "decimal"), dt == "numeric":
 		if notNull {
 			return "float64"
+		}
+		if emitPointersForNull {
+			return "*float64"
 		}
 		return "sql.NullFloat64"
 

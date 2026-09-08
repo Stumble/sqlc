@@ -8,14 +8,6 @@
         "version": {
             "const": "2"
         },
-        "project": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                }
-            }
-        },
         "cloud": {
             "type": "object",
             "properties": {
@@ -39,6 +31,9 @@
                     "engine"
                 ],
                 "properties": {
+                    "name": {
+                        "type": "string"
+                    },
                     "engine": {
                         "enum": [
                             "postgresql",
@@ -77,6 +72,20 @@
                         "properties": {
                             "uri": {
                                 "type": "string"
+                            },
+                            "managed": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "analyzer": {
+                        "type": "object",
+                        "properties": {
+                            "database": {
+                                "oneOf": [
+                                    {"type": "boolean"},
+                                    {"const": "only"}
+                                ]
                             }
                         }
                     },
@@ -128,11 +137,20 @@
                                     "emit_pointers_for_null_types": {
                                         "type": "boolean"
                                     },
+                                    "emit_pointers_for_null_enum_types": {
+                                        "type": "boolean"
+                                    },
                                     "emit_enum_valid_method": {
                                         "type": "boolean"
                                     },
                                     "emit_all_enum_values": {
                                         "type": "boolean"
+                                    },
+                                    "emit_sql_as_comment": {
+                                        "type": "boolean"
+                                    },
+                                    "build_tags": {
+                                        "type": "string"
                                     },
                                     "json_tags_case_style": {
                                         "type": "string"

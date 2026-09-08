@@ -1,6 +1,6 @@
 name: Bug Report
 description: File a bug report
-labels: [bug, triage]
+labels: [bug]
 body:
   - type: dropdown
     id: version
@@ -9,13 +9,14 @@ body:
       description: What version of sqlc are you running? If you don't know, run `sqlc version`.
       multiple: false
       options:
-        - 1.21.0
-        - 1.20.0
-        - 1.19.1
-        - 1.19.0
-        - 1.18.0
-        - 1.17.2
-        - 1.16.0
+        - 1.31.1
+        - 1.31.0
+        - 1.30.0
+        - 1.29.0
+        - 1.28.0
+        - 1.27.0
+        - 1.26.0
+        - 1.25.0
         - Other
     validations:
       required: true
@@ -50,7 +51,7 @@ body:
     id: config
     attributes:
       label: Configuration
-      description: Please include the sqlc.yaml or sqlc.json file you using in your project. This will be automatically formatted, so no need for backticks.
+      description: Please include the sqlc.(yaml|yml) or sqlc.json file you using in your project. This will be automatically formatted, so no need for backticks.
       render: yaml
   - type: input
     id: playground

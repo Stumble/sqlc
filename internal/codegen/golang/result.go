@@ -1,29 +1,19 @@
 package golang
 
 import (
+	"bufio"
 	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/sqlc-dev/sqlc/internal/codegen/golang/opts"
 	"github.com/sqlc-dev/sqlc/internal/codegen/sdk"
 	"github.com/sqlc-dev/sqlc/internal/inflection"
 	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
-
-	"golang.org/x/exp/constraints"
 )
 
-var (
-	reservedNames = make(map[string]bool)
-)
-
-func init() {
-	reservedNames["load"] = true
-	reservedNames["dump"] = true
-	reservedNames["check"] = true
-}
-
-func buildEnums(req *plugin.CodeGenRequest) []Enum {
+func buildEnums(req *plugin.GenerateRequest, options *opts.Options) []Enum {
 	var enums []Enum
 	for _, schema := range req.Catalog.Schemas {
 		if schema.Name == "pg_catalog" || schema.Name == "information_schema" {
@@ -38,14 +28,14 @@ func buildEnums(req *plugin.CodeGenRequest) []Enum {
 			}
 
 			e := Enum{
-				Name:      StructName(enumName, req.Settings),
+				Name:      StructName(enumName, options),
 				Comment:   enum.Comment,
 				NameTags:  map[string]string{},
 				ValidTags: map[string]string{},
 			}
-			if req.Settings.Go.EmitJsonTags {
-				e.NameTags["json"] = JSONTagName(enumName, req.Settings)
-				e.ValidTags["json"] = JSONTagName("valid", req.Settings)
+			if options.EmitJsonTags {
+				e.NameTags["json"] = JSONTagName(enumName, options)
+				e.ValidTags["json"] = JSONTagName("valid", options)
 			}
 
 			seen := make(map[string]struct{}, len(enum.Vals))
@@ -55,7 +45,7 @@ func buildEnums(req *plugin.CodeGenRequest) []Enum {
 					value = fmt.Sprintf("value_%d", i)
 				}
 				e.Constants = append(e.Constants, Constant{
-					Name:  StructName(enumName+"_"+value, req.Settings),
+					Name:  StructName(enumName+"_"+value, options),
 					Value: v,
 					Type:  e.Name,
 				})
@@ -70,18 +60,13 @@ func buildEnums(req *plugin.CodeGenRequest) []Enum {
 	return enums
 }
 
-func buildStructs(req *plugin.CodeGenRequest) []Struct {
+func buildStructs(req *plugin.GenerateRequest, options *opts.Options) []Struct {
 	var structs []Struct
 	for _, schema := range req.Catalog.Schemas {
 		if schema.Name == "pg_catalog" || schema.Name == "information_schema" {
 			continue
 		}
 		for _, table := range schema.Tables {
-			// only the last table schema, which is the first table creation SQL in sqlc.yaml file
-			// in the `schema: []` array, will be generated.
-			if !table.GenerateModel {
-				continue
-			}
 			var tableName string
 			if schema.Name == req.Catalog.DefaultSchema {
 				tableName = table.Rel.Name
@@ -89,35 +74,38 @@ func buildStructs(req *plugin.CodeGenRequest) []Struct {
 				tableName = schema.Name + "_" + table.Rel.Name
 			}
 			structName := tableName
-			if !req.Settings.Go.EmitExactTableNames {
+			if !options.EmitExactTableNames {
 				structName = inflection.Singular(inflection.SingularParams{
 					Name:       structName,
-					Exclusions: req.Settings.Go.InflectionExcludeTableNames,
+					Exclusions: options.InflectionExcludeTableNames,
 				})
 			}
 			s := Struct{
 				Table:   &plugin.Identifier{Schema: schema.Name, Name: table.Rel.Name},
-				Name:    StructName(structName, req.Settings),
+				Name:    StructName(structName, options),
 				Comment: table.Comment,
 			}
 			for _, column := range table.Columns {
 				tags := map[string]string{}
-				if req.Settings.Go.EmitDbTags {
+				if options.EmitDbTags {
 					tags["db"] = column.Name
 				}
-				// forked version always emit JSON tag.
-				tags["json"] = JSONTagName(column.Name, req.Settings)
-				addExtraGoStructTags(tags, req, column)
+				if options.EmitJsonTags {
+					tags["json"] = JSONTagName(column.Name, options)
+				}
+				addExtraGoStructTags(tags, req, options, column)
 				s.Fields = append(s.Fields, Field{
-					Name:    StructName(column.Name, req.Settings),
-					DBName:  column.Name,
-					Type:    goType(req, column),
+					Name:    StructName(column.Name, options),
+					Type:    goType(req, options, column),
 					Tags:    tags,
 					Comment: column.Comment,
 				})
 			}
 			structs = append(structs, s)
 		}
+	}
+	if len(structs) > 0 {
+		sort.Slice(structs, func(i, j int) bool { return structs[i].Name < structs[j].Name })
 	}
 	return structs
 }
@@ -153,9 +141,7 @@ func newGoEmbed(embed *plugin.Identifier, structs []Struct, defaultSchema string
 		}
 
 		fields := make([]Field, len(s.Fields))
-		for i, f := range s.Fields {
-			fields[i] = f
-		}
+		copy(fields, s.Fields)
 
 		return &goEmbed{
 			modelType: s.Name,
@@ -195,11 +181,7 @@ func argName(name string) string {
 	return out
 }
 
-func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error) {
-	queryNames := make(map[string]bool)
-	for _, query := range req.Queries {
-		queryNames[query.Name] = true
-	}
+func buildQueries(req *plugin.GenerateRequest, options *opts.Options, structs []Struct) ([]Query, error) {
 	qs := make([]Query, 0, len(req.Queries))
 	for _, query := range req.Queries {
 		if query.Name == "" {
@@ -209,39 +191,49 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 			continue
 		}
 
-		if reservedNames[strings.ToLower(query.Name)] {
-			return nil, fmt.Errorf(
-				"Query name %s is reserved word, please change it", query.Name)
-		}
-
 		var constantName string
-		if req.Settings.Go.EmitExportedQueries {
+		if options.EmitExportedQueries {
 			constantName = sdk.Title(query.Name)
 		} else {
 			constantName = sdk.LowerTitle(query.Name)
 		}
 
+		comments := query.Comments
+		if options.EmitSqlAsComment {
+			if len(comments) == 0 {
+				comments = append(comments, query.Name)
+			}
+			comments = append(comments, " ")
+			scanner := bufio.NewScanner(strings.NewReader(query.Text))
+			for scanner.Scan() {
+				line := scanner.Text()
+				comments = append(comments, "  "+line)
+			}
+			if err := scanner.Err(); err != nil {
+				return nil, err
+			}
+		}
+
 		gq := Query{
 			Cmd:          query.Cmd,
 			ConstantName: constantName,
-			Pkg:          req.Settings.Go.Package,
 			FieldName:    sdk.LowerTitle(query.Name) + "Stmt",
 			MethodName:   query.Name,
 			SourceName:   query.Filename,
 			SQL:          query.Text,
-			Comments:     query.Comments,
+			Comments:     comments,
 			Table:        query.InsertIntoTable,
 		}
-		sqlpkg := parseDriver(req.Settings.Go.SqlPackage)
+		sqlpkg := parseDriver(options.SqlPackage)
 
-		qpl := int(*req.Settings.Go.QueryParameterLimit)
+		qpl := int(*options.QueryParameterLimit)
 
 		if len(query.Params) == 1 && qpl != 0 {
 			p := query.Params[0]
 			gq.Arg = QueryValue{
-				Name:      paramName(p),
+				Name:      escape(paramName(p)),
 				DBName:    p.Column.GetName(),
-				Typ:       goType(req, p.Column),
+				Typ:       goType(req, options, p.Column),
 				SQLDriver: sqlpkg,
 				Column:    p.Column,
 			}
@@ -253,7 +245,7 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 					Column: p.Column,
 				})
 			}
-			s, err := columnsToStruct(req, gq.MethodName+"Params", cols, false)
+			s, err := columnsToStruct(req, options, gq.MethodName+"Params", cols, false)
 			if err != nil {
 				return nil, err
 			}
@@ -262,10 +254,12 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 				Name:        "arg",
 				Struct:      s,
 				SQLDriver:   sqlpkg,
-				EmitPointer: req.Settings.Go.EmitParamsStructPointers,
+				EmitPointer: options.EmitParamsStructPointers,
 			}
 
-			if len(query.Params) <= qpl {
+			// if query params is 2, and query params limit is 4 AND this is a copyfrom, we still want to emit the query's model
+			// otherwise we end up with a copyfrom using a struct without the struct definition
+			if len(query.Params) <= qpl && query.Cmd != ":copyfrom" {
 				gq.Arg.Emit = false
 			}
 		}
@@ -273,13 +267,29 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 		if len(query.Columns) == 1 && query.Columns[0].EmbedTable == nil {
 			c := query.Columns[0]
 			name := columnName(c, 0)
-			if c.IsFuncCall {
-				name = strings.Replace(name, "$", "_", -1)
+			name = strings.Replace(name, "$", "_", -1)
+			retName := escape(name)
+			// For :one queries the scan destination lives in the same scope as
+			// the query parameters, so reusing a parameter's name would cause
+			// Scan to overwrite the input and leak it back to the caller on
+			// sql.ErrNoRows (see sqlc-dev/sqlc#4354). Rename the return
+			// variable when it would collide.
+			if query.Cmd == metadata.CmdOne {
+				argNames := map[string]struct{}{}
+				for _, p := range gq.Arg.Pairs() {
+					argNames[p.Name] = struct{}{}
+				}
+				for {
+					if _, conflict := argNames[retName]; !conflict {
+						break
+					}
+					retName += "_2"
+				}
 			}
 			gq.Ret = QueryValue{
-				Name:      name,
+				Name:      retName,
 				DBName:    name,
-				Typ:       goType(req, c),
+				Typ:       goType(req, options, c),
 				SQLDriver: sqlpkg,
 			}
 		} else if putOutColumns(query) {
@@ -293,8 +303,8 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 				same := true
 				for i, f := range s.Fields {
 					c := query.Columns[i]
-					sameName := f.Name == StructName(columnName(c, i), req.Settings)
-					sameType := f.Type == goType(req, c)
+					sameName := f.Name == StructName(columnName(c, i), options)
+					sameType := f.Type == goType(req, options, c)
 					sameTable := sdk.SameTableName(c.Table, s.Table, req.Catalog.DefaultSchema)
 					if !sameName || !sameType || !sameTable {
 						same = false
@@ -316,7 +326,7 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 					})
 				}
 				var err error
-				gs, err = columnsToStruct(req, gq.MethodName+"Row", columns, true)
+				gs, err = columnsToStruct(req, options, gq.MethodName+"Row", columns, true)
 				if err != nil {
 					return nil, err
 				}
@@ -327,82 +337,26 @@ func buildQueries(req *plugin.CodeGenRequest, structs []Struct) ([]Query, error)
 				Name:        "i",
 				Struct:      gs,
 				SQLDriver:   sqlpkg,
-				EmitPointer: req.Settings.Go.EmitResultStructPointers,
+				EmitPointer: options.EmitResultStructPointers,
 			}
 		}
-		var err error
-		gq.Option, err = parseOption(query.Options, queryNames)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to parse options for %s because %w", query.Name, err)
-		}
+
 		qs = append(qs, gq)
 	}
 	sort.Slice(qs, func(i, j int) bool { return qs[i].MethodName < qs[j].MethodName })
 	return qs, nil
 }
 
-func buildQueryInvalidates(queries []Query) error {
-	qmap := make(map[string]*Query)
-	for i := range queries {
-		qmap[queries[i].MethodName] = &queries[i]
-	}
-
-	for i := range queries {
-		mutation := &queries[i]
-		unamer := NewUniqueNamer()
-		for _, toInvalidateName := range mutation.Option.Invalidates {
-			query := qmap[toInvalidateName]
-			if query.Option.Cache <= 0 {
-				return fmt.Errorf("%s tries to invalidate %s, which is not cached",
-					mutation.MethodName, toInvalidateName)
-			}
-			methodName := sdk.LowerTitle(query.MethodName)
-			if query.Arg.isEmpty() {
-				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
-					Q:        query,
-					NoArg:    true,
-					CacheKey: genCacheKeyWithArgName(*query, ""), // string key
-				})
-			} else {
-				if query.Arg.IsTypePointer() {
-					err := fmt.Errorf(
-						"Although invalidate pointer-typed argument is supported (%s tries to invalidate %s) , the generated type will be **T",
-						mutation.MethodName, query.MethodName)
-					fmt.Printf("WARNING: %s\n", err)
-				}
-				argName := unamer.UniqueName(methodName)
-				// additional pointer will be added to invalidate query key,
-				// so when we generate cache key, add 1 additional deref.
-				derefArgName := fmt.Sprintf("(*%s)", argName)
-				cacheKey := genCacheKeyWithArgName(*query, derefArgName)
-				mutation.Invalidates = append(mutation.Invalidates, InvalidateParam{
-					Q:        query,
-					ArgName:  argName,
-					CacheKey: cacheKey,
-				})
-			}
-		}
-	}
-	return nil
-}
-
-func buildDumpLoader(structs []Struct) (*DumpLoader, error) {
-	if len(structs) == 0 {
-		return nil, fmt.Errorf("Cannot find main struct")
-	}
-	return &DumpLoader{MainStruct: &structs[0]}, nil
+var cmdReturnsData = map[string]struct{}{
+	metadata.CmdBatchMany: {},
+	metadata.CmdBatchOne:  {},
+	metadata.CmdMany:      {},
+	metadata.CmdOne:       {},
 }
 
 func putOutColumns(query *plugin.Query) bool {
-	if len(query.Columns) > 0 {
-		return true
-	}
-	for _, allowed := range []string{metadata.CmdMany, metadata.CmdOne, metadata.CmdBatchMany} {
-		if query.Cmd == allowed {
-			return true
-		}
-	}
-	return false
+	_, found := cmdReturnsData[query.Cmd]
+	return found
 }
 
 // It's possible that this method will generate duplicate JSON tag values
@@ -413,7 +367,7 @@ func putOutColumns(query *plugin.Query) bool {
 // JSON tags: count, count_2, count_2
 //
 // This is unlikely to happen, so don't fix it yet
-func columnsToStruct(req *plugin.CodeGenRequest, name string, columns []goColumn, useID bool) (*Struct, error) {
+func columnsToStruct(req *plugin.GenerateRequest, options *opts.Options, name string, columns []goColumn, useID bool) (*Struct, error) {
 	gs := Struct{
 		Name: name,
 	}
@@ -429,7 +383,7 @@ func columnsToStruct(req *plugin.CodeGenRequest, name string, columns []goColumn
 			tagName = SetCaseStyle(colName, "snake")
 		}
 
-		fieldName := StructName(colName, req.Settings)
+		fieldName := StructName(colName, options)
 		baseFieldName := fieldName
 		// Track suffixes by the ID of the column, so that columns referring to the same numbered parameter can be
 		// reused.
@@ -445,13 +399,13 @@ func columnsToStruct(req *plugin.CodeGenRequest, name string, columns []goColumn
 			fieldName = fmt.Sprintf("%s_%d", fieldName, suffix)
 		}
 		tags := map[string]string{}
-		if req.Settings.Go.EmitDbTags {
+		if options.EmitDbTags {
 			tags["db"] = tagName
 		}
-		if req.Settings.Go.EmitJsonTags {
-			tags["json"] = JSONTagName(tagName, req.Settings)
+		if options.EmitJsonTags {
+			tags["json"] = JSONTagName(tagName, options)
 		}
-		addExtraGoStructTags(tags, req, c.Column)
+		addExtraGoStructTags(tags, req, options, c.Column)
 		f := Field{
 			Name:   fieldName,
 			DBName: colName,
@@ -459,7 +413,7 @@ func columnsToStruct(req *plugin.CodeGenRequest, name string, columns []goColumn
 			Column: c.Column,
 		}
 		if c.embed == nil {
-			f.Type = goType(req, c.Column)
+			f.Type = goType(req, options, c.Column)
 		} else {
 			f.Type = c.embed.modelType
 			f.EmbedFields = c.embed.fields
@@ -509,32 +463,4 @@ func checkIncompatibleFieldTypes(fields []Field) error {
 		}
 	}
 	return nil
-}
-
-func max[T constraints.Ordered](s []T) T {
-	if len(s) == 0 {
-		var zero T
-		return zero
-	}
-	m := s[0]
-	for _, v := range s {
-		if m < v {
-			m = v
-		}
-	}
-	return m
-}
-
-func min[T constraints.Ordered](s []T) T {
-	if len(s) == 0 {
-		var zero T
-		return zero
-	}
-	m := s[0]
-	for _, v := range s {
-		if m > v {
-			m = v
-		}
-	}
-	return m
 }

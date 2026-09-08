@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	"github.com/sqlc-dev/sqlc/internal/sql/ast"
@@ -62,7 +63,10 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 		}
 		table, err := c.GetTable(fqn)
 		if err != nil {
-			// If the table name doesn't exist, fisrt check if it's a CTE
+			if qc == nil {
+				continue
+			}
+			// If the table name doesn't exist, first check if it's a CTE
 			if _, qcerr := qc.GetTable(fqn); qcerr != nil {
 				return nil, err
 			}
@@ -94,6 +98,20 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 	}
 
 	var a []Parameter
+
+	addUnknownParam := func(ref paramRef) {
+		defaultP := named.NewInferredParam(ref.name, false)
+		p, isNamed := params.FetchMerge(ref.ref.Number, defaultP)
+		a = append(a, Parameter{
+			Number: ref.ref.Number,
+			Column: &Column{
+				Name:         p.Name(),
+				DataType:     "any",
+				IsNamedParam: isNamed,
+			},
+		})
+	}
+
 	for _, ref := range args {
 		switch n := ref.parent.(type) {
 
@@ -141,7 +159,7 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 				// TODO: Move this to database-specific engine package
 				dataType := "any"
 				if astutils.Join(n.Name, ".") == "||" {
-					dataType = "string"
+					dataType = "text"
 				}
 
 				defaultP := named.NewParam("")
@@ -169,6 +187,10 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 				case 2:
 					alias = items[0]
 					key = items[1]
+				case 3:
+					// schema := items[0]
+					alias = items[1]
+					key = items[2]
 				default:
 					panic("too many field items: " + strconv.Itoa(len(items)))
 				}
@@ -310,6 +332,8 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 					ReturnType: &ast.TypeName{Name: "any"},
 				}
 			}
+
+			var added bool
 			for i, item := range n.Args.Items {
 				funcName := fun.Name
 				var argName string
@@ -349,6 +373,7 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 
 					defaultP := named.NewInferredParam(defaultName, false)
 					p, isNamed := params.FetchMerge(ref.ref.Number, defaultP)
+					added = true
 					a = append(a, Parameter{
 						Number: ref.ref.Number,
 						Column: &Column{
@@ -390,6 +415,7 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 
 				defaultP := named.NewInferredParam(paramName, true)
 				p, isNamed := params.FetchMerge(ref.ref.Number, defaultP)
+				added = true
 				a = append(a, Parameter{
 					Number: ref.ref.Number,
 					Column: &Column{
@@ -403,6 +429,9 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 			}
 
 			if fun.ReturnType == nil {
+				if !added {
+					addUnknownParam(ref)
+				}
 				continue
 			}
 
@@ -412,7 +441,9 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 				Name:    fun.ReturnType.Name,
 			})
 			if err != nil {
-				// The return type wasn't a table.
+				if !added {
+					addUnknownParam(ref)
+				}
 				continue
 			}
 			err = indexTable(table)
@@ -482,10 +513,11 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 			}
 			col := toColumn(n.TypeName)
 			defaultP := named.NewInferredParam(col.Name, col.NotNull)
-			p, _ := params.FetchMerge(ref.ref.Number, defaultP)
+			p, isNamed := params.FetchMerge(ref.ref.Number, defaultP)
 
 			col.Name = p.Name()
 			col.NotNull = p.NotNull()
+			col.IsNamedParam = isNamed
 			a = append(a, Parameter{
 				Number: ref.ref.Number,
 				Column: col,
@@ -580,8 +612,6 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 						})
 					}
 				}
-			} else {
-				fmt.Println("------------------------")
 			}
 
 			if found == 0 {
@@ -600,7 +630,8 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 			}
 
 		default:
-			fmt.Printf("unsupported reference type: %T\n", n)
+			slog.Debug("unsupported reference type", "type", fmt.Sprintf("%T", n))
+			addUnknownParam(ref)
 		}
 	}
 	return a, nil

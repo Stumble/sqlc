@@ -1,6 +1,3 @@
-//go:build !windows && cgo
-// +build !windows,cgo
-
 package postgresql
 
 import (
@@ -9,10 +6,10 @@ import (
 	"io"
 	"strings"
 
-	nodes "github.com/pganalyze/pg_query_go/v4"
-	"github.com/pganalyze/pg_query_go/v4/parser"
+	nodes "github.com/pganalyze/pg_query_go/v6"
 
-	"github.com/sqlc-dev/sqlc/internal/metadata"
+	"github.com/sqlc-dev/sqlc/internal/engine/postgresql/parser"
+	"github.com/sqlc-dev/sqlc/internal/source"
 	"github.com/sqlc-dev/sqlc/internal/sql/ast"
 	"github.com/sqlc-dev/sqlc/internal/sql/sqlerr"
 )
@@ -154,7 +151,7 @@ func (p *Parser) Parse(r io.Reader) ([]ast.Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	tree, err := nodes.Parse(string(contents))
+	tree, err := Parse(string(contents))
 	if err != nil {
 		pErr := normalizeErr(err)
 		return nil, pErr
@@ -199,8 +196,8 @@ func normalizeErr(err error) error {
 }
 
 // https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-COMMENTS
-func (p *Parser) CommentSyntax() metadata.CommentSyntax {
-	return metadata.CommentSyntax{
+func (p *Parser) CommentSyntax() source.CommentSyntax {
+	return source.CommentSyntax{
 		Dash:      true,
 		SlashStar: true,
 	}
@@ -236,7 +233,7 @@ func translate(node *nodes.Node) (ast.Node, error) {
 		n := inner.AlterObjectSchemaStmt
 		switch n.ObjectType {
 
-		case nodes.ObjectType_OBJECT_TABLE:
+		case nodes.ObjectType_OBJECT_TABLE, nodes.ObjectType_OBJECT_VIEW, nodes.ObjectType_OBJECT_MATVIEW:
 			rel := parseRelationFromRangeVar(n.Relation)
 			return &ast.AlterTableSetSchemaStmt{
 				Table:     rel.TableName(),
@@ -274,7 +271,7 @@ func translate(node *nodes.Node) (ast.Node, error) {
 				case nodes.AlterTableType_AT_AddColumn:
 					d, ok := altercmd.Def.Node.(*nodes.Node_ColumnDef)
 					if !ok {
-						return nil, fmt.Errorf("expected alter table defintion to be a ColumnDef")
+						return nil, fmt.Errorf("expected alter table definition to be a ColumnDef")
 					}
 
 					rel, err := parseRelationFromNodes(d.ColumnDef.TypeName.Names)
@@ -293,7 +290,7 @@ func translate(node *nodes.Node) (ast.Node, error) {
 				case nodes.AlterTableType_AT_AlterColumnType:
 					d, ok := altercmd.Def.Node.(*nodes.Node_ColumnDef)
 					if !ok {
-						return nil, fmt.Errorf("expected alter table defintion to be a ColumnDef")
+						return nil, fmt.Errorf("expected alter table definition to be a ColumnDef")
 					}
 					col := ""
 					if altercmd.Name != "" {
@@ -438,12 +435,21 @@ func translate(node *nodes.Node) (ast.Node, error) {
 				if err != nil {
 					return nil, err
 				}
+
+				primary := false
+				for _, con := range item.ColumnDef.Constraints {
+					if constraint, ok := con.Node.(*nodes.Node_Constraint); ok {
+						primary = constraint.Constraint.Contype == nodes.ConstrType_CONSTR_PRIMARY
+					}
+				}
+
 				create.Cols = append(create.Cols, &ast.ColumnDef{
-					Colname:   item.ColumnDef.Colname,
-					TypeName:  rel.TypeName(),
-					IsNotNull: isNotNull(item.ColumnDef) || primaryKey[item.ColumnDef.Colname],
-					IsArray:   isArray(item.ColumnDef.TypeName),
-					ArrayDims: len(item.ColumnDef.TypeName.ArrayBounds),
+					Colname:    item.ColumnDef.Colname,
+					TypeName:   rel.TypeName(),
+					IsNotNull:  isNotNull(item.ColumnDef) || primaryKey[item.ColumnDef.Colname],
+					IsArray:    isArray(item.ColumnDef.TypeName),
+					ArrayDims:  len(item.ColumnDef.TypeName.ArrayBounds),
+					PrimaryKey: primary,
 				})
 			}
 		}
@@ -488,6 +494,7 @@ func translate(node *nodes.Node) (ast.Node, error) {
 			ReturnType: rt,
 			Replace:    n.Replace,
 			Params:     &ast.List{},
+			Options:    convertSlice(n.Options),
 		}
 		for _, item := range n.Parameters {
 			arg := item.Node.(*nodes.Node_FunctionParameter).FunctionParameter
@@ -611,7 +618,7 @@ func translate(node *nodes.Node) (ast.Node, error) {
 				MissingOk: n.MissingOk,
 			}, nil
 
-		case nodes.ObjectType_OBJECT_TABLE:
+		case nodes.ObjectType_OBJECT_TABLE, nodes.ObjectType_OBJECT_MATVIEW, nodes.ObjectType_OBJECT_VIEW:
 			rel := parseRelationFromRangeVar(n.Relation)
 			return &ast.RenameTableStmt{
 				Table:     rel.TableName(),

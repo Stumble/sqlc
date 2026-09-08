@@ -1,5 +1,8 @@
 {
   "version": "1",
+  "cloud": {
+    "project": "01HAQMMECEYQYKFJN8MP16QC41"
+  },
   "packages": [
     {
       "name": "booktest",
@@ -7,8 +10,12 @@
       "schema": "postgresql/schema.sql",
       "queries": "postgresql/query.sql",
       "engine": "postgresql",
+      "sql_package": "pgx/v5",
       "database": {
-        "uri": "postgresql://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/booktest"
+        "uri": "${VET_TEST_EXAMPLES_POSTGRES_BOOKTEST}"
+      },
+      "analyzer": {
+        "database": false
       },
       "rules": [
         "sqlc/db-prepare"
@@ -21,7 +28,7 @@
       "queries": "mysql/query.sql",
       "engine": "mysql",
       "database": {
-        "uri": "root:${MYSQL_ROOT_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/booktest?multiStatements=true&parseTime=true"
+        "uri": "${VET_TEST_EXAMPLES_MYSQL_BOOKTEST}"
       },
       "rules": [
         "sqlc/db-prepare"

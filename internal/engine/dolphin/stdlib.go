@@ -637,6 +637,19 @@ func defaultSchema(name string) *catalog.Schema {
 			ReturnType: &ast.TypeName{Name: "date"},
 		},
 		{
+			// DATE_ADD with INTERVAL expression (2 args)
+			Name: "DATE_ADD",
+			Args: []*catalog.Argument{
+				{
+					Type: &ast.TypeName{Name: "date"},
+				},
+				{
+					Type: &ast.TypeName{Name: "interval"},
+				},
+			},
+			ReturnType: &ast.TypeName{Name: "date"},
+		},
+		{
 			Name: "DATE_ADD_INTERVAL",
 			Args: []*catalog.Argument{
 				{
@@ -671,6 +684,19 @@ func defaultSchema(name string) *catalog.Schema {
 				},
 				{
 					Type: &ast.TypeName{Name: "any"},
+				},
+			},
+			ReturnType: &ast.TypeName{Name: "date"},
+		},
+		{
+			// DATE_SUB with INTERVAL expression (2 args)
+			Name: "DATE_SUB",
+			Args: []*catalog.Argument{
+				{
+					Type: &ast.TypeName{Name: "date"},
+				},
+				{
+					Type: &ast.TypeName{Name: "interval"},
 				},
 			},
 			ReturnType: &ast.TypeName{Name: "date"},
@@ -2387,6 +2413,15 @@ func defaultSchema(name string) *catalog.Schema {
 			Name:       "NOW",
 			Args:       []*catalog.Argument{},
 			ReturnType: &ast.TypeName{Name: "datetime"},
+		},
+		{
+			Name: "NEXTVAL",
+			Args: []*catalog.Argument{
+				{
+					Type: &ast.TypeName{Name: "any"},
+				},
+			},
+			ReturnType: &ast.TypeName{Name: "int"},
 		},
 		{
 			Name: "NOW",

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sqlc-dev/sqlc/internal/codegen/golang/opts"
 	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
 )
@@ -15,7 +16,7 @@ type QueryValue struct {
 	DBName      string // The name of the field in the database. Only set if Struct==nil.
 	Struct      *Struct
 	Typ         string
-	SQLDriver   SQLDriver
+	SQLDriver   opts.SQLDriver
 
 	// Column is kept so late in the generation process around to differentiate
 	// between mysql slices and pg arrays
@@ -48,7 +49,7 @@ func (v QueryValue) Pair() string {
 	for _, arg := range v.Pairs() {
 		out = append(out, arg.Name+" "+arg.Type)
 	}
-	return strings.TrimRight(strings.Join(out, ","), ",")
+	return strings.Join(out, ",")
 }
 
 // Return the argument name and type for query methods. Should only be used in
@@ -61,7 +62,7 @@ func (v QueryValue) Pairs() []Argument {
 		var out []Argument
 		for _, f := range v.Struct.Fields {
 			out = append(out, Argument{
-				Name: toLowerCase(f.Name),
+				Name: escape(toLowerCase(f.Name)),
 				Type: f.Type,
 			})
 		}
@@ -69,7 +70,7 @@ func (v QueryValue) Pairs() []Argument {
 	}
 	return []Argument{
 		{
-			Name: v.Name,
+			Name: escape(v.Name),
 			Type: v.DefineType(),
 		},
 	}
@@ -92,10 +93,6 @@ func (v QueryValue) Type() string {
 	panic("no type for QueryValue: " + v.Name)
 }
 
-func (v QueryValue) IsTypePointer() bool {
-	return !v.isEmpty() && strings.HasPrefix(v.Type(), "*")
-}
-
 func (v *QueryValue) DefineType() string {
 	t := v.Type()
 	if v.IsPointer() {
@@ -106,9 +103,9 @@ func (v *QueryValue) DefineType() string {
 
 func (v *QueryValue) ReturnName() string {
 	if v.IsPointer() {
-		return "&" + v.Name
+		return "&" + escape(v.Name)
 	}
-	return v.Name
+	return escape(v.Name)
 }
 
 func (v QueryValue) UniqueFields() []Field {
@@ -133,24 +130,24 @@ func (v QueryValue) Params() string {
 	var out []string
 	if v.Struct == nil {
 		if !v.Column.IsSqlcSlice && strings.HasPrefix(v.Typ, "[]") && v.Typ != "[]byte" && !v.SQLDriver.IsPGX() {
-			out = append(out, "pq.Array("+v.Name+")")
+			out = append(out, "pq.Array("+escape(v.Name)+")")
 		} else {
-			out = append(out, v.Name)
+			out = append(out, escape(v.Name))
 		}
 	} else {
 		for _, f := range v.Struct.Fields {
 			if !f.HasSqlcSlice() && strings.HasPrefix(f.Type, "[]") && f.Type != "[]byte" && !v.SQLDriver.IsPGX() {
-				out = append(out, "pq.Array("+v.VariableForField(f)+")")
+				out = append(out, "pq.Array("+escape(v.VariableForField(f))+")")
 			} else {
-				out = append(out, v.VariableForField(f))
+				out = append(out, escape(v.VariableForField(f)))
 			}
 		}
 	}
 	if len(out) <= 3 {
-		return strings.TrimRight(strings.Join(out, ","), ",")
+		return strings.Join(out, ",")
 	}
 	out = append(out, "")
-	return strings.TrimRight(("\n" + strings.Join(out, ",\n")), ",\n")
+	return "\n" + strings.Join(out, ",\n")
 }
 
 func (v QueryValue) ColumnNames() []string {
@@ -170,7 +167,11 @@ func (v QueryValue) ColumnNamesAsGoSlice() string {
 	}
 	escapedNames := make([]string, len(v.Struct.Fields))
 	for i, f := range v.Struct.Fields {
-		escapedNames[i] = fmt.Sprintf("%q", f.DBName)
+		if f.Column != nil && f.Column.OriginalName != "" {
+			escapedNames[i] = fmt.Sprintf("%q", f.Column.OriginalName)
+		} else {
+			escapedNames[i] = fmt.Sprintf("%q", f.DBName)
+		}
 	}
 	return "[]string{" + strings.Join(escapedNames, ", ") + "}"
 }
@@ -195,7 +196,7 @@ func (v QueryValue) Scan() string {
 		if strings.HasPrefix(v.Typ, "[]") && v.Typ != "[]byte" && !v.SQLDriver.IsPGX() {
 			out = append(out, "pq.Array(&"+v.Name+")")
 		} else {
-			out = append(out, v.Name)
+			out = append(out, "&"+v.Name)
 		}
 	} else {
 		for _, f := range v.Struct.Fields {
@@ -253,34 +254,10 @@ func (v QueryValue) VariableForField(f Field) string {
 	return v.Name + "." + f.Name
 }
 
-// CacheKeySprintf is used by WPgx only.
-func (v QueryValue) CacheKeySprintf() string {
-	if v.Struct == nil {
-		panic(fmt.Errorf("trying to construct sprintf format for non-struct query arg: %+v", v))
-	}
-	format := make([]string, 0)
-	args := make([]string, 0)
-	for _, f := range v.Struct.Fields {
-		format = append(format, "%+v")
-		if strings.HasPrefix(f.Type, "*") {
-			args = append(args, wrapPtrStr(v.Name+"."+f.Name))
-		} else {
-			args = append(args, v.Name+"."+f.Name)
-		}
-	}
-	formatStr := `"` + strings.Join(format, ",") + `"`
-	if len(args) <= 3 {
-		return formatStr + ", " + strings.Join(args, ",")
-	}
-	args = append(args, "")
-	return formatStr + ",\n" + strings.Join(args, ",\n")
-}
-
 // A struct used to generate methods and fields on the Queries struct
 type Query struct {
 	Cmd          string
 	Comments     []string
-	Pkg          string
 	MethodName   string
 	FieldName    string
 	ConstantName string
@@ -288,8 +265,6 @@ type Query struct {
 	SourceName   string
 	Ret          QueryValue
 	Arg          QueryValue
-	Option       WPgxOption
-	Invalidates  []InvalidateParam
 	// Used for :copyfrom
 	Table *plugin.Identifier
 }
@@ -318,112 +293,4 @@ func (q Query) TableIdentifierForMySQL() string {
 		}
 	}
 	return strings.Join(escapedNames, ".")
-}
-
-// CountIntent is used by WPgx only.
-func (q Query) CountIntent() bool {
-	return q.Option.CountIntent
-}
-
-// AllowReplica is used by WPgx only.
-func (q Query) AllowReplica() bool {
-	return q.Option.AllowReplica
-}
-
-// CacheKey is used by WPgx only.
-func (q Query) CacheKey() string {
-	return genCacheKeyWithArgName(q, q.Arg.Name)
-}
-
-// InvalidateArgs is used by WPgx only.
-func (q Query) InvalidateArgs() string {
-	rv := ""
-	// pretty hacky, but works...
-	if !q.Arg.isEmpty() {
-		rv = ","
-	}
-	for _, inv := range q.Invalidates {
-		if inv.NoArg {
-			continue
-		}
-		t := "*" + inv.Q.Arg.Type()
-		rv += fmt.Sprintf("%s %s,", inv.ArgName, t)
-	}
-	return strings.TrimRight(rv, ",")
-}
-
-// InvalidateArgsNames is used by WPgx only.
-func (q Query) InvalidateArgsNames() string {
-	rv := ""
-	// pretty hacky, but works...
-	if !q.Arg.isEmpty() {
-		rv = ", "
-	}
-	for _, inv := range q.Invalidates {
-		if inv.NoArg {
-			continue
-		}
-		rv += inv.ArgName + ","
-	}
-	return strings.TrimRight(rv, ",")
-}
-
-// UniqueLabel is used by WPgx only.
-func (q Query) UniqueLabel() string {
-	return fmt.Sprintf("%s.%s", q.Pkg, q.MethodName)
-}
-
-// CacheUniqueLabel is used by WPgx only.
-func (q Query) CacheUniqueLabel() string {
-	return fmt.Sprintf("%s:%s:", q.Pkg, q.MethodName)
-}
-
-// ConnType is used by WPgx only.
-// Returns the interface type that the query should be called on, either CacheWGConn or CacheQuerierConn.
-// NOTE: because we have check the mutually exclusiveness, that invalidates can only happen on
-// queries that are not read-only, we can safely assume that if the query does not have invalidates,
-// CacheQuerierConn is enough.
-func (q Query) ConnType() string {
-	if len(q.Invalidates) > 0 {
-		return "CacheWGConn"
-	} else {
-		return "CacheQuerierConn"
-	}
-}
-
-// IsConnTypeQuerier is used by WPgx only.
-// Returns true if the query should be called on CacheQuerierConn.
-func (q Query) IsConnTypeQuerier() bool {
-	return len(q.Invalidates) == 0
-}
-
-func genCacheKeyWithArgName(q Query, argName string) string {
-	if len(q.Pkg) == 0 {
-		panic("empty pkg name is invalid")
-	}
-	prefix := q.CacheUniqueLabel()
-	if q.Arg.isEmpty() {
-		return `"` + prefix + `"`
-	}
-	// when it's non-struct parameter, generate inline fmt.Sprintf.
-	if q.Arg.Struct == nil {
-		if q.Arg.IsTypePointer() {
-			argName = wrapPtrStr(argName)
-		}
-		fmtStr := `hashIfLong(fmt.Sprintf("%+v",` + argName + `))`
-		return fmt.Sprintf("\"%s\" + %s", prefix, fmtStr)
-	} else {
-		return argName + `.CacheKey()`
-	}
-}
-
-func wrapPtrStr(v string) string {
-	return fmt.Sprintf("ptrStr(%s)", v)
-}
-
-type InvalidateParam struct {
-	Q        *Query
-	NoArg    bool
-	ArgName  string
-	CacheKey string
 }

@@ -1,5 +1,4 @@
 //go:build examples
-// +build examples
 
 package ondeck
 
@@ -9,9 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sqlc-dev/sqlc/internal/sqltest"
-
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/sqlc-dev/sqlc/internal/sqltest/local"
 )
 
 func join(vals ...string) sql.NullString {
@@ -45,8 +45,8 @@ func runOnDeckQueries(t *testing.T, q *Queries) {
 		Name:            "The Fillmore",
 		City:            city.Slug,
 		SpotifyPlaylist: "spotify:uri",
-		Status:          VenuesStatusOpen,
-		Statuses:        join(string(VenuesStatusOpen), string(VenuesStatusClosed)),
+		Status:          VenueStatusOpen,
+		Statuses:        join(string(VenueStatusOpen), string(VenueStatusClosed)),
 		Tags:            join("rock", "punk"),
 	})
 	if err != nil {
@@ -143,10 +143,14 @@ func runOnDeckQueries(t *testing.T, q *Queries) {
 func TestPrepared(t *testing.T) {
 	t.Parallel()
 
-	sdb, cleanup := sqltest.MySQL(t, []string{"schema"})
-	defer cleanup()
+	uri := local.MySQL(t, []string{"schema"})
+	db, err := sql.Open("mysql", uri)
+	if err != nil {
+		t.Fatalf("%s: %s", uri, err)
+	}
+	defer db.Close()
 
-	q, err := Prepare(context.Background(), sdb)
+	q, err := Prepare(context.Background(), db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,8 +161,12 @@ func TestPrepared(t *testing.T) {
 func TestQueries(t *testing.T) {
 	t.Parallel()
 
-	sdb, cleanup := sqltest.MySQL(t, []string{"schema"})
-	defer cleanup()
+	uri := local.MySQL(t, []string{"schema"})
+	db, err := sql.Open("mysql", uri)
+	if err != nil {
+		t.Fatalf("%s: %s", uri, err)
+	}
+	defer db.Close()
 
-	runOnDeckQueries(t, New(sdb))
+	runOnDeckQueries(t, New(db))
 }

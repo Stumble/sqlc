@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 
-	"github.com/sqlc-dev/sqlc/internal/codegen/golang"
 	"github.com/sqlc-dev/sqlc/internal/config"
 	"github.com/sqlc-dev/sqlc/internal/debug"
 	"github.com/sqlc-dev/sqlc/internal/info"
@@ -26,26 +25,30 @@ import (
 )
 
 func init() {
-	uploadCmd.Flags().BoolP("dry-run", "", false, "dump upload request (default: false)")
+	createDBCmd.Flags().StringP("queryset", "", "", "name of the queryset to use")
+	pushCmd.Flags().BoolP("dry-run", "", false, "dump push request (default: false)")
 	initCmd.Flags().BoolP("v1", "", false, "generate v1 config yaml file")
 	initCmd.Flags().BoolP("v2", "", true, "generate v2 config yaml file")
 	initCmd.MarkFlagsMutuallyExclusive("v1", "v2")
+	parseCmd.Flags().StringP("dialect", "d", "", "SQL dialect to use (postgresql, mysql, or sqlite)")
 }
 
 // Do runs the command logic.
 func Do(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	rootCmd := &cobra.Command{Use: "sqlc", SilenceUsage: true}
 	rootCmd.PersistentFlags().StringP("file", "f", "", "specify an alternate config file (default: sqlc.yaml)")
-	rootCmd.PersistentFlags().BoolP("experimental", "x", false, "DEPRECATED: enable experimental features (default: false)")
 	rootCmd.PersistentFlags().Bool("no-remote", false, "disable remote execution (default: false)")
-	rootCmd.PersistentFlags().Bool("no-database", false, "disable database connections (default: false)")
+	rootCmd.PersistentFlags().Bool("remote", false, "enable remote execution (default: false)")
 
 	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(createDBCmd)
 	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(genCmd)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(parseCmd)
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(uploadCmd)
+	rootCmd.AddCommand(verifyCmd)
+	rootCmd.AddCommand(pushCmd)
 	rootCmd.AddCommand(NewCmdVet())
 
 	rootCmd.SetArgs(args)
@@ -137,19 +140,21 @@ var initCmd = &cobra.Command{
 type Env struct {
 	DryRun     bool
 	Debug      opts.Debug
+	Experiment opts.Experiment
+	Remote     bool
 	NoRemote   bool
-	NoDatabase bool
 }
 
 func ParseEnv(c *cobra.Command) Env {
 	dr := c.Flag("dry-run")
+	r := c.Flag("remote")
 	nr := c.Flag("no-remote")
-	nodb := c.Flag("no-database")
 	return Env{
 		DryRun:     dr != nil && dr.Changed,
 		Debug:      opts.DebugFromEnv(),
+		Experiment: opts.ExperimentFromEnv(),
+		Remote:     r != nil && r.Value.String() == "true",
 		NoRemote:   nr != nil && nr.Value.String() == "true",
-		NoDatabase: nodb != nil && nodb.Value.String() == "true",
 	}
 }
 
@@ -159,11 +164,6 @@ func (e *Env) Validate(cfg *config.Config) error {
 	for _, plugin := range cfg.Plugins {
 		if plugin.Process != nil && !e.Debug.ProcessPlugins {
 			return ErrPluginProcessDisabled
-		}
-	}
-	for _, sql := range cfg.SQL {
-		if sql.Gen.Go != nil && sql.Gen.Go.SQLPackage != golang.SQLPackageWPGX {
-			return fmt.Errorf("This forked version of sqlc only support WPGX as sql package")
 		}
 	}
 	return nil
@@ -194,12 +194,15 @@ func getConfigPath(stderr io.Writer, f *pflag.Flag) (string, string) {
 
 var genCmd = &cobra.Command{
 	Use:   "generate",
-	Short: "Generate Go code from SQL",
+	Short: "Generate source code from SQL",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		defer trace.StartRegion(cmd.Context(), "generate").End()
 		stderr := cmd.ErrOrStderr()
 		dir, name := getConfigPath(stderr, cmd.Flag("file"))
-		output, err := Generate(cmd.Context(), ParseEnv(cmd), dir, name, stderr)
+		output, err := Generate(cmd.Context(), dir, name, &Options{
+			Env:    ParseEnv(cmd),
+			Stderr: stderr,
+		})
 		if err != nil {
 			os.Exit(1)
 		}
@@ -215,20 +218,6 @@ var genCmd = &cobra.Command{
 	},
 }
 
-var uploadCmd = &cobra.Command{
-	Use:   "upload",
-	Short: "Upload the schema, queries, and configuration for this project",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		stderr := cmd.ErrOrStderr()
-		dir, name := getConfigPath(stderr, cmd.Flag("file"))
-		if err := createPkg(cmd.Context(), ParseEnv(cmd), dir, name, stderr); err != nil {
-			fmt.Fprintf(stderr, "error uploading: %s\n", err)
-			os.Exit(1)
-		}
-		return nil
-	},
-}
-
 var checkCmd = &cobra.Command{
 	Use:   "compile",
 	Short: "Statically check SQL for syntax and type errors",
@@ -236,7 +225,11 @@ var checkCmd = &cobra.Command{
 		defer trace.StartRegion(cmd.Context(), "compile").End()
 		stderr := cmd.ErrOrStderr()
 		dir, name := getConfigPath(stderr, cmd.Flag("file"))
-		if _, err := Generate(cmd.Context(), ParseEnv(cmd), dir, name, stderr); err != nil {
+		_, err := Generate(cmd.Context(), dir, name, &Options{
+			Env:    ParseEnv(cmd),
+			Stderr: stderr,
+		})
+		if err != nil {
 			os.Exit(1)
 		}
 		return nil
@@ -279,7 +272,11 @@ var diffCmd = &cobra.Command{
 		defer trace.StartRegion(cmd.Context(), "diff").End()
 		stderr := cmd.ErrOrStderr()
 		dir, name := getConfigPath(stderr, cmd.Flag("file"))
-		if err := Diff(cmd.Context(), ParseEnv(cmd), dir, name, stderr); err != nil {
+		opts := &Options{
+			Env:    ParseEnv(cmd),
+			Stderr: stderr,
+		}
+		if err := Diff(cmd.Context(), dir, name, opts); err != nil {
 			os.Exit(1)
 		}
 		return nil

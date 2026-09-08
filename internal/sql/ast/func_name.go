@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/sqlc-dev/sqlc/internal/sql/format"
+
 type FuncName struct {
 	Catalog string
 	Schema  string
@@ -8,4 +10,17 @@ type FuncName struct {
 
 func (n *FuncName) Pos() int {
 	return 0
+}
+
+func (n *FuncName) Format(buf *TrackedBuffer, d format.Dialect) {
+	if n == nil {
+		return
+	}
+	if n.Schema != "" {
+		buf.WriteString(n.Schema)
+		buf.WriteString(".")
+	}
+	if n.Name != "" {
+		buf.WriteString(n.Name)
+	}
 }

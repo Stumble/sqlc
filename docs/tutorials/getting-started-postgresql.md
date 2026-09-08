@@ -1,17 +1,27 @@
-# Getting started with PostgreSQL 
+# Getting started with PostgreSQL
 
 This tutorial assumes that the latest version of sqlc is
 [installed](../overview/install.md) and ready to use.
 
+We'll generate Go code here, but other
+[language plugins](../reference/language-support.rst) are available. You'll
+naturally need the Go toolchain if you want to build and run a program with the
+code sqlc generates, but sqlc itself has no dependencies.
+
+At the end, you'll push your SQL queries to [sqlc
+Cloud](https://dashboard.sqlc.dev/) for further insights and analysis.
+
+## Setting up
+
 Create a new directory called `sqlc-tutorial` and open it up.
 
-Initialize a new Go module named `tutorial.sqlc.dev/app`
+Initialize a new Go module named `tutorial.sqlc.dev/app`:
 
 ```shell
 go mod init tutorial.sqlc.dev/app
 ```
 
-sqlc looks for either a `sqlc.yaml` or `sqlc.json` file in the current
+sqlc looks for either a `sqlc.(yaml|yml)` or `sqlc.json` file in the current
 directory. In our new directory, create a file named `sqlc.yaml` with the
 following contents:
 
@@ -25,7 +35,10 @@ sql:
       go:
         package: "tutorial"
         out: "tutorial"
+        sql_package: "pgx/v5"
 ```
+
+## Schema and queries
 
 sqlc needs to know your database schema and queries in order to generate code.
 In the same directory, create a file named `schema.sql` with the following
@@ -39,7 +52,7 @@ CREATE TABLE authors (
 );
 ```
 
-Next, create a `query.sql` file with the following four queries:
+Next, create a `query.sql` file with the following five queries:
 
 ```sql
 -- name: GetAuthor :one
@@ -58,23 +71,19 @@ INSERT INTO authors (
 )
 RETURNING *;
 
--- name: DeleteAuthor :exec
-DELETE FROM authors
-WHERE id = $1;
-```
-
-If you **do not** want your SQL `UPDATE` queries to return the updated record
-to the user, add this to `query.sql`:
-
-```sql
 -- name: UpdateAuthor :exec
 UPDATE authors
   set name = $2,
   bio = $3
 WHERE id = $1;
+
+-- name: DeleteAuthor :exec
+DELETE FROM authors
+WHERE id = $1;
 ```
 
-Otherwise, to return the updated record to the user, add this to `query.sql`:
+If you prefer, you can alter the `UpdateAuthor` query to return the updated
+record:
 
 ```sql
 -- name: UpdateAuthor :one
@@ -85,13 +94,17 @@ WHERE id = $1
 RETURNING *;
 ```
 
-You are now ready to generate code. You shouldn't see any errors or output.
+## Generating code
+
+You are now ready to generate code. You shouldn't see any output when you run
+the `generate` subcommand, unless something goes wrong:
 
 ```shell
 sqlc generate
 ```
 
-You should now have a `tutorial` package containing three files.
+You should now have a `tutorial` subdirectory with three files containing Go
+source code. These files comprise a Go package named `tutorial`:
 
 ```
 ├── go.mod
@@ -104,31 +117,35 @@ You should now have a `tutorial` package containing three files.
     └── query.sql.go
 ```
 
-You can use your newly generated queries in `app.go`.
+## Using generated code
+
+You can use your newly-generated `tutorial` package from any Go program.
+Create a file named `tutorial.go` and add the following contents:
 
 ```go
 package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"reflect"
 
-	"tutorial.sqlc.dev/app/tutorial"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
-	_ "github.com/lib/pq"
+	"tutorial.sqlc.dev/app/tutorial"
 )
 
 func run() error {
 	ctx := context.Background()
 
-	db, err := sql.Open("postgres", "user=pqgotest dbname=pqgotest sslmode=verify-full")
+	conn, err := pgx.Connect(ctx, "user=pqgotest dbname=pqgotest sslmode=verify-full")
 	if err != nil {
 		return err
 	}
+	defer conn.Close(ctx)
 
-	queries := tutorial.New(db)
+	queries := tutorial.New(conn)
 
 	// list all authors
 	authors, err := queries.ListAuthors(ctx)
@@ -140,7 +157,7 @@ func run() error {
 	// create an author
 	insertedAuthor, err := queries.CreateAuthor(ctx, tutorial.CreateAuthorParams{
 		Name: "Brian Kernighan",
-		Bio:  sql.NullString{String: "Co-author of The C Programming Language and The Go Programming Language", Valid: true},
+		Bio:  pgtype.Text{String: "Co-author of The C Programming Language and The Go Programming Language", Valid: true},
 	})
 	if err != nil {
 		return err
@@ -165,13 +182,67 @@ func main() {
 }
 ```
 
-Before the code will compile, you'll need to add the Go PostgreSQL driver.
+Before this code will compile you'll need to fetch the relevant PostgreSQL
+driver. You can use `lib/pq` with the standard library's `database/sql`
+package, but in this tutorial we've used `pgx/v5`:
 
-```
-go get github.com/lib/pq
+```shell
+go get github.com/jackc/pgx/v5
 go build ./...
 ```
 
-sqlc generates readable, **idiomatic** Go code that you otherwise would have
-had to write yourself. Take a look in the `tutorial` package to see what code
-sqlc generated.
+The program should compile without errors. To make that possible, sqlc generates
+readable, **idiomatic** Go code that you otherwise would've had to write
+yourself. Take a look in `tutorial/query.sql.go`.
+
+Of course for this program to run successfully you'll need
+to compile after replacing the database connection parameters in the call to
+`pgx.Connect()` with the correct parameters for your database. And your
+database must have the `authors` table as defined in `schema.sql`.
+
+You should now have a working program using sqlc's generated Go source code,
+and hopefully can see how you'd use sqlc in your own real-world applications.
+
+## Query verification
+
+[sqlc Cloud](https://dashboard.sqlc.dev) provides additional verification, catching subtle bugs. To get started, create a
+[dashboard account](https://dashboard.sqlc.dev). Once you've signed in, create a
+project and generate an auth token. Add your project's ID to the `cloud` block
+to your sqlc.yaml.
+
+```yaml
+version: "2"
+cloud:
+  # Replace <PROJECT_ID> with your project ID from the sqlc Cloud dashboard
+  project: "<PROJECT_ID>"
+sql:
+  - engine: "postgresql"
+    queries: "query.sql"
+    schema: "schema.sql"
+    gen:
+      go:
+        package: "tutorial"
+        out: "tutorial"
+        sql_package: "pgx/v5"
+```
+
+Replace `<PROJECT_ID>` with your project ID from the sqlc Cloud dashboard. It
+will look something like `01HA8SZH31HKYE9RR3N3N3TSJM`.
+
+And finally, set the `SQLC_AUTH_TOKEN` environment variable:
+
+```shell
+export SQLC_AUTH_TOKEN="<your sqlc auth token>"
+```
+
+```shell
+$ sqlc push --tag tutorial
+```
+
+In the sidebar, go to the "Queries" section to see your published queries. Run
+`verify` to ensure that previously published queries continue to work against
+updated database schema.
+
+```shell
+$ sqlc verify --against tutorial
+```

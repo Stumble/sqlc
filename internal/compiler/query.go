@@ -1,12 +1,15 @@
 package compiler
 
 import (
+	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/sql/ast"
+	"github.com/sqlc-dev/sqlc/internal/sql/catalog"
 )
 
 type Function struct {
 	Rel        *ast.FuncName
 	ReturnType *ast.TypeName
+	Outs       []*catalog.Argument
 }
 
 type Table struct {
@@ -41,16 +44,9 @@ type Column struct {
 
 type Query struct {
 	SQL      string
-	Name     string
-	Cmd      string // TODO: Pick a better name. One of: one, many, exec, execrows, copyFrom
-	Flags    map[string]bool
-	Options  map[string]string // key value pairs of extra options.
+	Metadata metadata.Metadata
 	Columns  []*Column
 	Params   []Parameter
-	Comments []string
-
-	// XXX: Hack
-	Filename string
 
 	// Needed for CopyFrom
 	InsertIntoTable *ast.TableName

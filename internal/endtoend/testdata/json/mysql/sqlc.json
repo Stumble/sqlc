@@ -4,8 +4,9 @@
     {
       "path": "go",
       "engine": "mysql",
+      "sql_driver": "github.com/go-sql-driver/mysql",
       "name": "querytest",
-      "schema": "query.sql",
+      "schema": "schema.sql",
       "queries": "query.sql"
     }
   ]

@@ -1,45 +1,42 @@
-CGO_ENABLED = 1
-COMMIT_HASH := $(shell git --no-pager describe --tags --always --dirty)
-LDFLAGS = "-X github.com/sqlc-dev/sqlc/internal/info.Version=$(COMMIT_HASH)-wicked-fork"
-# macOS 15.4+ needs strchrnul fix
-BUILD_ENV = $(shell [ "$$(uname -s)" = "Darwin" ] && [ "$$(sw_vers -productVersion | cut -d. -f1)" -ge 15 ] && echo 'MACOSX_DEPLOYMENT_TARGET=15.4 CGO_CFLAGS="-DHAVE_STRCHRNUL"')
-
-.PHONY: build build-endtoend test test-ci test-examples test-endtoend regen start psql mysqlsh proto
+.PHONY: build build-endtoend test test-ci test-examples test-endtoend start psql mysqlsh proto
 
 build:
-	$(BUILD_ENV) CGO_ENABLED=$(CGO_ENABLED) go build -ldflags=$(LDFLAGS) -o bin/ ./cmd/...
+	go build ./...
 
 install:
-	$(BUILD_ENV) CGO_ENABLED=$(CGO_ENABLED) go install -ldflags=$(LDFLAGS) ./cmd/...
+	go install ./...
 
 test:
-	CGO_ENABLED=$(CGO_ENABLED) go test ./...
+	go test ./...
+
+test-managed:
+	MYSQL_SERVER_URI="invalid" POSTGRESQL_SERVER_URI="postgres://postgres:mysecretpassword@localhost:5432/postgres" go test -v ./...
 
 vet:
-	CGO_ENABLED=$(CGO_ENABLED) go vet ./...
+	go vet ./...
 
 test-examples:
-	CGO_ENABLED=$(CGO_ENABLED) go test --tags=examples ./...
+	go test --tags=examples ./...
 
 build-endtoend:
-	cd ./internal/endtoend/testdata && CGO_ENABLED=$(CGO_ENABLED) go build ./...
+	cd ./internal/endtoend/testdata && go build ./...
 
 test-ci: test-examples build-endtoend vet
 
-regen: sqlc-dev sqlc-gen-json
-	CGO_ENABLED=$(CGO_ENABLED) go run ./scripts/regenerate/
-
 sqlc-dev:
-	CGO_ENABLED=$(CGO_ENABLED) go build -o ~/bin/sqlc-dev ./cmd/sqlc/
+	go build -o ~/bin/sqlc-dev ./cmd/sqlc/
 
 sqlc-pg-gen:
-	CGO_ENABLED=$(CGO_ENABLED) go build -o ~/bin/sqlc-pg-gen ./internal/tools/sqlc-pg-gen
+	go build -o ~/bin/sqlc-pg-gen ./internal/tools/sqlc-pg-gen
 
 sqlc-gen-json:
-	CGO_ENABLED=$(CGO_ENABLED) go build -o ~/bin/sqlc-gen-json ./cmd/sqlc-gen-json
+	go build -o ~/bin/sqlc-gen-json ./cmd/sqlc-gen-json
+
+test-json-process-plugin:
+	go build -o ~/bin/test-json-process-plugin ./scripts/test-json-process-plugin/
 
 start:
-	docker-compose up -d
+	docker compose up -d
 
 fmt:
 	go fmt ./...

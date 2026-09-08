@@ -1,11 +1,11 @@
 package metadata
 
 import (
-	"errors"
 	"testing"
 )
 
 func TestParseQueryNameAndType(t *testing.T) {
+
 	for _, query := range []string{
 		`-- name: CreateFoo, :one`,
 		`-- name: 9Foo_, :one`,
@@ -19,7 +19,7 @@ func TestParseQueryNameAndType(t *testing.T) {
 		"-- name:CreateFoo",
 		`--name:CreateFoo :two`,
 	} {
-		if _, err := ParseQueryNameAndType(query, CommentSyntax{Dash: true}); err == nil {
+		if _, _, err := ParseQueryNameAndType(query, CommentSyntax{Dash: true}); err == nil {
 			t.Errorf("expected invalid metadata: %q", query)
 		}
 	}
@@ -29,82 +29,154 @@ func TestParseQueryNameAndType(t *testing.T) {
 		`-- name comment`,
 		`--name comment`,
 	} {
-		if _, err := ParseQueryNameAndType(query, CommentSyntax{Dash: true}); err != nil {
+		if _, _, err := ParseQueryNameAndType(query, CommentSyntax{Dash: true}); err != nil {
 			t.Errorf("expected valid comment: %q", query)
 		}
 	}
 
-	query := `-- name: CreateFoo :one`
-	config, err := ParseQueryNameAndType(query, CommentSyntax{Dash: true})
-	if err != nil {
-		t.Errorf("expected valid metadata: %q", query)
-	}
-	if config.Name != "CreateFoo" {
-		t.Errorf("incorrect queryName parsed: %q", query)
-	}
-	if config.Cmd != CmdOne {
-		t.Errorf("incorrect queryType parsed: %q", query)
+	for query, cs := range map[string]CommentSyntax{
+		`-- name: CreateFoo :one`:    {Dash: true},
+		`# name: CreateFoo :one`:     {Hash: true},
+		`/* name: CreateFoo :one */`: {SlashStar: true},
+	} {
+		queryName, queryCmd, err := ParseQueryNameAndType(query, cs)
+		if err != nil {
+			t.Errorf("expected valid metadata: %q", query)
+		}
+		if queryName != "CreateFoo" {
+			t.Errorf("incorrect queryName parsed: (%q) %q", queryName, query)
+		}
+		if queryCmd != CmdOne {
+			t.Errorf("incorrect queryCmd parsed: (%q) %q", queryCmd, query)
+		}
 	}
 
+}
+
+func TestParseQueryParams(t *testing.T) {
+	for _, comments := range [][]string{
+		{
+			" name: CreateFoo :one",
+			" @param foo_id UUID",
+		},
+		{
+			" name: CreateFoo :one ",
+			" @param foo_id UUID ",
+		},
+		{
+			" name: CreateFoo :one",
+			"@param foo_id UUID",
+			" invalid",
+		},
+		{
+			" name: CreateFoo :one",
+			" @invalid",
+			" @param foo_id UUID",
+		},
+		{
+			" name: GetFoos :many ",
+			" @param foo_id UUID ",
+			" @param @invalid UUID ",
+		},
+	} {
+		params, _, _, err := ParseCommentFlags(comments)
+		if err != nil {
+			t.Errorf("expected comments to parse, got err: %s", err)
+		}
+
+		pt, ok := params["foo_id"]
+		if !ok {
+			t.Errorf("expected param not found")
+		}
+
+		if pt != "UUID" {
+			t.Error("unexpected param metadata:", pt)
+		}
+
+		_, ok = params["invalid"]
+		if ok {
+			t.Errorf("unexpected param found")
+		}
+	}
 }
 
 func TestParseQueryFlags(t *testing.T) {
 	for _, comments := range [][]string{
 		{
-			"-- name: CreateFoo :one",
-			"-- @flag-foo",
+			" name: CreateFoo :one",
+			" @flag-foo",
+		},
+		{
+			" name: CreateFoo :one ",
+			"@flag-foo ",
+		},
+		{
+			" name: CreateFoo :one",
+			" @flag-foo @flag-bar",
+		},
+		{
+			" name: GetFoos :many",
+			" @param @flag-bar UUID",
+			" @flag-foo",
+		},
+		{
+			" name: GetFoos :many",
+			" @flag-foo",
+			" @param @flag-bar UUID",
 		},
 	} {
-		flags, err := ParseQueryFlags(comments)
+		_, flags, _, err := ParseCommentFlags(comments)
 		if err != nil {
-			t.Errorf("expected query flags to parse, got error: %s", err)
+			t.Errorf("expected comments to parse, got err: %s", err)
 		}
 
 		if !flags["@flag-foo"] {
 			t.Errorf("expected flag not found")
 		}
+
+		if flags["@flag-bar"] {
+			t.Errorf("unexpected flag found")
+		}
 	}
 }
 
-func TestParseMetadataWithOptions(t *testing.T) {
-	for _, tc := range []struct {
-		query   string
-		options [][2]string
-		err     error
-	}{
+func TestParseQueryRuleSkiplist(t *testing.T) {
+	for _, comments := range [][]string{
 		{
-			"-- name: q :one\n-- -- key:value",
-			[][2]string{{"key", "value"}},
-			nil,
+			" name: CreateFoo :one",
+			" @sqlc-vet-disable sqlc/db-prepare delete-without-where ",
 		},
 		{
-			"-- name: q :one\n-- -- no key value pairs",
-			nil,
-			errors.New("no key value pair"),
+			" name: CreateFoo :one ",
+			" @sqlc-vet-disable sqlc/db-prepare ",
+			" @sqlc-vet-disable delete-without-where ",
 		},
 		{
-			"-- name: q :one\n-- --    key   :    value   ",
-			[][2]string{{"key", "value"}},
-			nil,
+			" name: CreateFoo :one",
+			" @sqlc-vet-disable sqlc/db-prepare ",
+			" update-without where",
+			" @sqlc-vet-disable delete-without-where ",
 		},
 	} {
-		config, err := ParseQueryNameAndType(tc.query, CommentSyntax{Dash: true})
-		if tc.err == nil {
-			if err != nil {
-				t.Errorf("unexpected err: %s %s", tc.query, err)
-			}
-			if len(config.Options) != len(tc.options) {
-				t.Errorf("option parse error, query: %s, expected: %+v, got: %+v", tc.query, tc.options, config.Options)
-			}
-			for _, opt := range tc.options {
-				val, ok := config.Options[opt[0]]
-				if !ok || val != opt[1] {
-					t.Errorf(
-						"option parse error, query: %s, expect: %+v, got: %+v",
-						tc.query, tc.options, config.Options)
+		_, flags, ruleSkiplist, err := ParseCommentFlags(comments)
+		if err != nil {
+			t.Errorf("expected comments to parse, got err: %s", err)
+		}
 
-				}
-			}
+		if !flags["@sqlc-vet-disable"] {
+			t.Errorf("expected @sqlc-vet-disable flag not found")
+		}
+
+		if _, ok := ruleSkiplist["sqlc/db-prepare"]; !ok {
+			t.Errorf("expected rule not found in skiplist")
+		}
+
+		if _, ok := ruleSkiplist["delete-without-where"]; !ok {
+			t.Errorf("expected rule not found in skiplist")
+		}
+
+		if _, ok := ruleSkiplist["update-without-where"]; ok {
+			t.Errorf("unexpected rule found in skiplist")
 		}
 	}
 }

@@ -1,5 +1,8 @@
 {
   "version": "1",
+  "cloud": {
+    "project": "01HAQMMECEYQYKFJN8MP16QC41"
+  },
   "packages": [
     {
       "path": "postgresql",
@@ -8,12 +11,15 @@
       "queries": "postgresql/query.sql",
       "engine": "postgresql",
       "database": {
-        "uri": "postgresql://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/batch"
+        "uri": "${VET_TEST_EXAMPLES_POSTGRES_BATCH}"
+      },
+      "analyzer": {
+        "database": false
       },
       "rules": [
         "sqlc/db-prepare"
       ],
-      "sql_package": "pgx/v4",
+      "sql_package": "pgx/v5",
       "emit_json_tags": true,
       "emit_prepared_queries": true,
       "emit_interface": true

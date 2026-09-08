@@ -69,66 +69,21 @@ type Post struct {
 }
 ```
 
-### goose
+### dbmate
 
 ```sql
--- +goose Up
-CREATE TABLE post (
-    id    int NOT NULL,
-    title text,
-    body  text,
-    PRIMARY KEY(id)
-);
+-- migrate:up
+CREATE TABLE foo (bar INT NOT NULL);
 
--- +goose Down
-DROP TABLE post;
+-- migrate:down
+DROP TABLE foo;
 ```
 
 ```go
 package db
 
-type Post struct {
-	ID    int
-	Title sql.NullString
-	Body  sql.NullString
-}
-```
-
-### sql-migrate
-
-```sql
--- +migrate Up
--- SQL in section 'Up' is executed when this migration is applied
-CREATE TABLE people (id int);
-
-
--- +migrate Down
--- SQL section 'Down' is executed when this migration is rolled back
-DROP TABLE people;
-```
-
-```go
-package db
-
-type People struct {
-	ID int32
-}
-```
-
-### tern
-
-```sql
-CREATE TABLE comment (id int NOT NULL, text text NOT NULL);
----- create above / drop below ----
-DROP TABLE comment;
-```
-
-```go
-package db
-
-type Comment struct {
-	ID   int32
-	Text string
+type Foo struct {
+	Bar int32
 }
 ```
 
@@ -188,20 +143,90 @@ type Post struct {
 }
 ```
 
-### dbmate
+### goose
+
+**Warning:**
+sqlc parses migration files in lexicographic order. **If you are using numeric filenames for migrations in Goose and you choose to have sqlc enumerate your migration files**,
+make sure their numeric ordering matches their lexicographic ordering to avoid
+unexpected behavior. This can be done by prepending enough zeroes to the
+migration filenames.
+
+This doesn't work as intended.
+
+```
+1_initial.sql
+...
+9_foo.sql
+# this migration file will be parsed BEFORE 9_foo
+10_bar.sql
+```
+
+This worked as intended.
+
+```
+001_initial.sql
+...
+009_foo.sql
+010_bar.sql
+```
 
 ```sql
--- migrate:up
-CREATE TABLE foo (bar INT NOT NULL);
+-- +goose Up
+CREATE TABLE post (
+    id    int NOT NULL,
+    title text,
+    body  text,
+    PRIMARY KEY(id)
+);
 
--- migrate:down
-DROP TABLE foo;
+-- +goose Down
+DROP TABLE post;
 ```
 
 ```go
 package db
 
-type Foo struct {
-	Bar int32
+type Post struct {
+	ID    int
+	Title sql.NullString
+	Body  sql.NullString
+}
+```
+
+### sql-migrate
+
+```sql
+-- +migrate Up
+-- SQL in section 'Up' is executed when this migration is applied
+CREATE TABLE people (id int);
+
+
+-- +migrate Down
+-- SQL section 'Down' is executed when this migration is rolled back
+DROP TABLE people;
+```
+
+```go
+package db
+
+type People struct {
+	ID int32
+}
+```
+
+### tern
+
+```sql
+CREATE TABLE comment (id int NOT NULL, text text NOT NULL);
+---- create above / drop below ----
+DROP TABLE comment;
+```
+
+```go
+package db
+
+type Comment struct {
+	ID   int32
+	Text string
 }
 ```

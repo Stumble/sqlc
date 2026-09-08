@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sqlc-dev/sqlc/internal/sql/sqlpath"
+	_ "github.com/ncruces/go-sqlite3/driver"
+	_ "github.com/ncruces/go-sqlite3/embed"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/sqlc-dev/sqlc/internal/sql/sqlpath"
 )
 
 func SQLite(t *testing.T, migrations []string) (*sql.DB, func()) {
@@ -16,6 +17,9 @@ func SQLite(t *testing.T, migrations []string) (*sql.DB, func()) {
 	// For each test, pick a new database name at random.
 	source, err := os.CreateTemp("", "sqltest_sqlite_")
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := source.Close(); err != nil {
 		t.Fatal(err)
 	}
 	return CreateSQLiteDatabase(t, source.Name(), migrations)

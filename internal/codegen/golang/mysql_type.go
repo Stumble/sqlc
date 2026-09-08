@@ -3,12 +3,13 @@ package golang
 import (
 	"log"
 
+	"github.com/sqlc-dev/sqlc/internal/codegen/golang/opts"
 	"github.com/sqlc-dev/sqlc/internal/codegen/sdk"
 	"github.com/sqlc-dev/sqlc/internal/debug"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
 )
 
-func mysqlType(req *plugin.CodeGenRequest, col *plugin.Column) string {
+func mysqlType(req *plugin.GenerateRequest, options *opts.Options, col *plugin.Column) string {
 	columnType := sdk.DataType(col.Type)
 	notNull := col.NotNull || col.IsArray
 	unsigned := col.Unsigned
@@ -30,14 +31,31 @@ func mysqlType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 		} else {
 			if notNull {
 				if unsigned {
-					return "uint32"
+					return "uint8"
 				}
-				return "int32"
+				return "int8"
 			}
-			return "sql.NullInt32"
+			// The database/sql package does not have a sql.NullInt8 type, so we
+			// use the smallest type they have which is NullInt16
+			return "sql.NullInt16"
 		}
 
-	case "int", "integer", "smallint", "mediumint", "year":
+	case "year":
+		if notNull {
+			return "int16"
+		}
+		return "sql.NullInt16"
+
+	case "smallint":
+		if notNull {
+			if unsigned {
+				return "uint16"
+			}
+			return "int16"
+		}
+		return "sql.NullInt16"
+
+	case "int", "integer", "mediumint":
 		if notNull {
 			if unsigned {
 				return "uint32"
@@ -46,7 +64,11 @@ func mysqlType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 		}
 		return "sql.NullInt32"
 
-	case "bigint":
+	case "bigint", "bigint unsigned", "bigint signed":
+		// "bigint unsigned" and "bigint signed" are MySQL CAST types
+		// Note: We use int64 for CAST AS UNSIGNED to match original behavior,
+		// even though uint64 would be more semantically correct.
+		// The Unsigned flag on columns (from table schema) still uses uint64.
 		if notNull {
 			if unsigned {
 				return "uint64"
@@ -101,14 +123,14 @@ func mysqlType(req *plugin.CodeGenRequest, col *plugin.Column) string {
 				if enum.Name == columnType {
 					if notNull {
 						if schema.Name == req.Catalog.DefaultSchema {
-							return StructName(enum.Name, req.Settings)
+							return StructName(enum.Name, options)
 						}
-						return StructName(schema.Name+"_"+enum.Name, req.Settings)
+						return StructName(schema.Name+"_"+enum.Name, options)
 					} else {
 						if schema.Name == req.Catalog.DefaultSchema {
-							return "Null" + StructName(enum.Name, req.Settings)
+							return "Null" + StructName(enum.Name, options)
 						}
-						return "Null" + StructName(schema.Name+"_"+enum.Name, req.Settings)
+						return "Null" + StructName(schema.Name+"_"+enum.Name, options)
 					}
 				}
 			}

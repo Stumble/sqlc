@@ -1,5 +1,4 @@
 //go:build examples
-// +build examples
 
 package ondeck
 
@@ -150,6 +149,7 @@ func TestPrepared(t *testing.T) {
 	t.Parallel()
 
 	sdb, cleanup := sqltest.SQLite(t, []string{"schema"})
+	defer sdb.Close()
 	defer cleanup()
 
 	q, err := Prepare(context.Background(), sdb)
@@ -164,6 +164,7 @@ func TestQueries(t *testing.T) {
 	t.Parallel()
 
 	sdb, cleanup := sqltest.SQLite(t, []string{"schema"})
+	defer sdb.Close()
 	defer cleanup()
 
 	runOnDeckQueries(t, New(sdb))

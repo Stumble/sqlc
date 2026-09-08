@@ -1,5 +1,8 @@
 {
   "version": "1",
+  "cloud": {
+    "project": "01HAQMMECEYQYKFJN8MP16QC41"
+  },
   "packages": [
     {
       "path": "postgresql",
@@ -7,8 +10,12 @@
       "schema": "postgresql/schema.sql",
       "queries": "postgresql/query-building.sql",
       "engine": "postgresql",
+      "sql_package": "pgx/v5",
       "database": {
-        "uri": "postgresql://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/jets"
+        "uri": "${VET_TEST_EXAMPLES_POSTGRES_JETS}"
+      },
+      "analyzer": {
+        "database": false
       },
       "rules": [
         "sqlc/db-prepare"

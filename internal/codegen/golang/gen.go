@@ -10,21 +10,20 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/sqlc-dev/sqlc/internal/codegen/golang/opts"
 	"github.com/sqlc-dev/sqlc/internal/codegen/sdk"
 	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
 )
 
 type tmplCtx struct {
-	Q            string
-	Package      string
-	SQLDriver    SQLDriver
-	Enums        []Enum
-	Structs      []Struct
-	GoQueries    []Query
-	SqlcVersion  string
-	DumpLoader   *DumpLoader
-	RawSchemaSQL string
+	Q           string
+	Package     string
+	SQLDriver   opts.SQLDriver
+	Enums       []Enum
+	Structs     []Struct
+	GoQueries   []Query
+	SqlcVersion string
 
 	// TODO: Race conditions
 	SourceName string
@@ -40,6 +39,9 @@ type tmplCtx struct {
 	EmitAllEnumValues         bool
 	UsesCopyFrom              bool
 	UsesBatch                 bool
+	OmitSqlcVersion           bool
+	BuildTags                 string
+	WrapErrors                bool
 }
 
 func (t *tmplCtx) OutputQuery(sourceName string) bool {
@@ -97,87 +99,110 @@ func (t *tmplCtx) codegenQueryRetval(q Query) (string, error) {
 	case ":execrows", ":execlastid":
 		return "result, err :=", nil
 	case ":execresult":
+		if t.WrapErrors {
+			return "result, err :=", nil
+		}
 		return "return", nil
 	default:
 		return "", fmt.Errorf("unhandled q.Cmd case %q", q.Cmd)
 	}
 }
 
-func Generate(ctx context.Context, req *plugin.CodeGenRequest) (*plugin.CodeGenResponse, error) {
-	enums := buildEnums(req)
-	structs := buildStructs(req)
-	queries, err := buildQueries(req, structs)
+func Generate(ctx context.Context, req *plugin.GenerateRequest) (*plugin.GenerateResponse, error) {
+	options, err := opts.Parse(req)
 	if err != nil {
 		return nil, err
 	}
-	if req.Settings.Go.OmitUnusedStructs {
+
+	if err := opts.ValidateOpts(options); err != nil {
+		return nil, err
+	}
+
+	enums := buildEnums(req, options)
+	structs := buildStructs(req, options)
+	queries, err := buildQueries(req, options, structs)
+	if err != nil {
+		return nil, err
+	}
+
+	if options.OmitUnusedStructs {
 		enums, structs = filterUnusedStructs(enums, structs, queries)
 	}
-	err = buildQueryInvalidates(queries)
-	if err != nil {
+
+	if err := validate(options, enums, structs, queries); err != nil {
 		return nil, err
 	}
 
-	// Starting from version v2.2.0, sqlc requires a timeout option for all queries
-	// Print errors for all queries that do not have a timeout option configured.
-	shouldFailed := false
-	for _, q := range queries {
-		if q.Option.Timeout == 0 {
-			errorf("%s/%s does not have a timeout option", q.Pkg, q.MethodName)
-			shouldFailed = true
-		}
-	}
-	if shouldFailed {
-		return nil, errors.New(timeoutRequiredErrorStr)
-	}
-
-	return generate(req, enums, structs, queries)
+	return generate(req, options, enums, structs, queries)
 }
 
-func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, queries []Query) (*plugin.CodeGenResponse, error) {
+func validate(options *opts.Options, enums []Enum, structs []Struct, queries []Query) error {
+	enumNames := make(map[string]struct{})
+	for _, enum := range enums {
+		enumNames[enum.Name] = struct{}{}
+		enumNames["Null"+enum.Name] = struct{}{}
+	}
+	structNames := make(map[string]struct{})
+	for _, struckt := range structs {
+		if _, ok := enumNames[struckt.Name]; ok {
+			return fmt.Errorf("struct name conflicts with enum name: %s", struckt.Name)
+		}
+		structNames[struckt.Name] = struct{}{}
+	}
+	if !options.EmitExportedQueries {
+		return nil
+	}
+	for _, query := range queries {
+		if _, ok := enumNames[query.ConstantName]; ok {
+			return fmt.Errorf("query constant name conflicts with enum name: %s", query.ConstantName)
+		}
+		if _, ok := structNames[query.ConstantName]; ok {
+			return fmt.Errorf("query constant name conflicts with struct name: %s", query.ConstantName)
+		}
+	}
+	return nil
+}
+
+func generate(req *plugin.GenerateRequest, options *opts.Options, enums []Enum, structs []Struct, queries []Query) (*plugin.GenerateResponse, error) {
 	i := &importer{
-		Settings: req.Settings,
-		Queries:  queries,
-		Enums:    enums,
-		Structs:  structs,
+		Options: options,
+		Queries: queries,
+		Enums:   enums,
+		Structs: structs,
 	}
 
-	golang := req.Settings.Go
-	dumploader, err := buildDumpLoader(structs)
-	if err != nil {
-		return nil, err
-	}
 	tctx := tmplCtx{
-		EmitInterface:             false,
-		EmitJSONTags:              true,
-		JsonTagsIDUppercase:       false,
-		EmitDBTags:                false,
-		EmitPreparedQueries:       false,
-		EmitEmptySlices:           false,
-		EmitMethodsWithDBArgument: false,
-		EmitEnumValidMethod:       true,
-		EmitAllEnumValues:         true,
+		EmitInterface:             options.EmitInterface,
+		EmitJSONTags:              options.EmitJsonTags,
+		JsonTagsIDUppercase:       options.JsonTagsIdUppercase,
+		EmitDBTags:                options.EmitDbTags,
+		EmitPreparedQueries:       options.EmitPreparedQueries,
+		EmitEmptySlices:           options.EmitEmptySlices,
+		EmitMethodsWithDBArgument: options.EmitMethodsWithDbArgument,
+		EmitEnumValidMethod:       options.EmitEnumValidMethod,
+		EmitAllEnumValues:         options.EmitAllEnumValues,
 		UsesCopyFrom:              usesCopyFrom(queries),
 		UsesBatch:                 usesBatch(queries),
-		SQLDriver:                 parseDriver(golang.SqlPackage),
+		SQLDriver:                 parseDriver(options.SqlPackage),
 		Q:                         "`",
-		Package:                   golang.Package,
+		Package:                   options.Package,
 		Enums:                     enums,
 		Structs:                   structs,
 		SqlcVersion:               req.SqlcVersion,
-		DumpLoader:                dumploader,
-		RawSchemaSQL:              strings.Join(req.Catalog.GetRawSqls(), "\n"),
+		BuildTags:                 options.BuildTags,
+		OmitSqlcVersion:           options.OmitSqlcVersion,
+		WrapErrors:                options.WrapErrors,
 	}
 
-	if tctx.UsesCopyFrom && !tctx.SQLDriver.IsPGX() && golang.SqlDriver != SQLDriverGoSQLDriverMySQL {
+	if tctx.UsesCopyFrom && !tctx.SQLDriver.IsPGX() && options.SqlDriver != opts.SQLDriverGoSQLDriverMySQL {
 		return nil, errors.New(":copyfrom is only supported by pgx and github.com/go-sql-driver/mysql")
 	}
 
-	if tctx.UsesCopyFrom && golang.SqlDriver == SQLDriverGoSQLDriverMySQL {
+	if tctx.UsesCopyFrom && options.SqlDriver == opts.SQLDriverGoSQLDriverMySQL {
 		if err := checkNoTimesForMySQLCopyFrom(queries); err != nil {
 			return nil, err
 		}
-		tctx.SQLDriver = SQLDriverGoSQLDriverMySQL
+		tctx.SQLDriver = opts.SQLDriverGoSQLDriverMySQL
 	}
 
 	if tctx.UsesBatch && !tctx.SQLDriver.IsPGX() {
@@ -189,6 +214,7 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 		"comment":    sdk.DoubleSlashComment,
 		"escape":     sdk.EscapeBacktick,
 		"imports":    i.Imports,
+		"hasImports": i.HasImports,
 		"hasPrefix":  strings.HasPrefix,
 
 		// These methods are Go specific, they do not belong in the codegen package
@@ -230,8 +256,8 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 			return fmt.Errorf("source error: %w", err)
 		}
 
-		if templateName == "queryFile" && golang.OutputFilesSuffix != "" {
-			name += golang.OutputFilesSuffix
+		if templateName == "queryFile" && options.OutputFilesSuffix != "" {
+			name += options.OutputFilesSuffix
 		}
 
 		if !strings.HasSuffix(name, ".go") {
@@ -242,25 +268,25 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 	}
 
 	dbFileName := "db.go"
-	if golang.OutputDbFileName != "" {
-		dbFileName = golang.OutputDbFileName
+	if options.OutputDbFileName != "" {
+		dbFileName = options.OutputDbFileName
 	}
 	modelsFileName := "models.go"
-	if golang.OutputModelsFileName != "" {
-		modelsFileName = golang.OutputModelsFileName
+	if options.OutputModelsFileName != "" {
+		modelsFileName = options.OutputModelsFileName
 	}
 	querierFileName := "querier.go"
-	if golang.OutputQuerierFileName != "" {
-		querierFileName = golang.OutputQuerierFileName
+	if options.OutputQuerierFileName != "" {
+		querierFileName = options.OutputQuerierFileName
 	}
 	copyfromFileName := "copyfrom.go"
-	if golang.OutputCopyfromFileName != "" {
-		copyfromFileName = golang.OutputCopyfromFileName
+	if options.OutputCopyfromFileName != "" {
+		copyfromFileName = options.OutputCopyfromFileName
 	}
 
 	batchFileName := "batch.go"
-	if golang.OutputBatchFileName != "" {
-		batchFileName = golang.OutputBatchFileName
+	if options.OutputBatchFileName != "" {
+		batchFileName = options.OutputBatchFileName
 	}
 
 	if err := execute(dbFileName, "dbFile"); err != nil {
@@ -269,7 +295,7 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 	if err := execute(modelsFileName, "modelsFile"); err != nil {
 		return nil, err
 	}
-	if golang.EmitInterface {
+	if options.EmitInterface {
 		if err := execute(querierFileName, "interfaceFile"); err != nil {
 			return nil, err
 		}
@@ -295,7 +321,7 @@ func generate(req *plugin.CodeGenRequest, enums []Enum, structs []Struct, querie
 			return nil, err
 		}
 	}
-	resp := plugin.CodeGenResponse{}
+	resp := plugin.GenerateResponse{}
 
 	for filename, code := range output {
 		resp.Files = append(resp.Files, &plugin.File{
@@ -329,6 +355,9 @@ func usesBatch(queries []Query) bool {
 
 func checkNoTimesForMySQLCopyFrom(queries []Query) error {
 	for _, q := range queries {
+		if q.Cmd != metadata.CmdCopyFrom {
+			continue
+		}
 		for _, f := range q.Arg.CopyFromMySQLFields() {
 			if f.Type == "time.Time" {
 				return fmt.Errorf("values with a timezone are not yet supported")
@@ -354,7 +383,10 @@ func filterUnusedStructs(enums []Enum, structs []Struct, queries []Query) ([]Enu
 			keepTypes[query.Ret.Type()] = struct{}{}
 			if query.Ret.IsStruct() {
 				for _, field := range query.Ret.Struct.Fields {
-					keepTypes[field.Type] = struct{}{}
+					keepTypes[strings.TrimPrefix(field.Type, "[]")] = struct{}{}
+					for _, embedField := range field.EmbedFields {
+						keepTypes[embedField.Type] = struct{}{}
+					}
 				}
 			}
 		}
@@ -364,7 +396,8 @@ func filterUnusedStructs(enums []Enum, structs []Struct, queries []Query) ([]Enu
 	for _, enum := range enums {
 		_, keep := keepTypes[enum.Name]
 		_, keepNull := keepTypes["Null"+enum.Name]
-		if keep || keepNull {
+		_, keepPointer := keepTypes["*"+enum.Name]
+		if keep || keepNull || keepPointer {
 			keepEnums = append(keepEnums, enum)
 		}
 	}

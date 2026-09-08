@@ -1,0 +1,33 @@
+name: kotlin
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '.readthedocs.yaml'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '.readthedocs.yaml'
+jobs:
+  build:
+    if: false
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.2'
+      - name: install ./...
+        run: go install ./...
+      - uses: actions/checkout@v6
+        with:
+          repository: sqlc-dev/sqlc-gen-kotlin
+          path: kotlin
+      - run: make test
+        working-directory: kotlin
+      - run: sqlc diff
+        working-directory: kotlin/examples
+

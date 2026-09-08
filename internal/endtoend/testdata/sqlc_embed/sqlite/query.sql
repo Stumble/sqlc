@@ -1,22 +1,3 @@
-ATTACH 'baz.db' AS baz;
-
-CREATE TABLE users (
-    id integer PRIMARY KEY,
-    name text NOT NULL,
-    age integer
-);
-
-CREATE TABLE posts (
-    id integer PRIMARY KEY,
-    user_id integer NOT NULL
-);
-
-CREATE TABLE baz.users (
-    id integer PRIMARY KEY,
-    name text NOT NULL
-);
-
-
 -- name: Only :one
 SELECT sqlc.embed(users) FROM users;
 
@@ -34,7 +15,7 @@ SELECT sqlc.embed(users), sqlc.embed(users) FROM users;
 
 -- name: Join :one
 SELECT sqlc.embed(u), sqlc.embed(p) FROM posts AS p
-INNER JOIN users AS u ON p.user_id = u.users.id;
+INNER JOIN users AS u ON p.user_id = u.id;
 
 -- name: WithSchema :one
 SELECT sqlc.embed(bu) FROM baz.users AS bu;

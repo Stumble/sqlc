@@ -1,18 +1,19 @@
-# Linting queries
+# `vet` - Linting queries
 
 *Added in v1.19.0*
 
 `sqlc vet` runs queries through a set of lint rules.
 
-Rules are defined in the `sqlc` [configuration](../reference/config) file. They consist
-of a name, message, and a [Common Expression Language (CEL)](https://github.com/google/cel-spec)
-expression. Expressions are evaluated using [cel-go](https://github.com/google/cel-go).
-If an expression evaluates to `true`, `sqlc vet` will report an error using the given message.
+Rules are defined in the `sqlc` [configuration](../reference/config) file. They
+consist of a name, message, and a [Common Expression Language
+(CEL)](https://github.com/google/cel-spec) expression. Expressions are evaluated
+using [cel-go](https://github.com/google/cel-go).  If an expression evaluates to
+`true`, `sqlc vet` will report an error using the given message.
 
 ## Defining lint rules
 
-Each lint rule's CEL expression has access to information from your sqlc configuration and queries
-via variables defined in the following proto messages.
+Each lint rule's CEL expression has access to information from your sqlc
+configuration and queries via variables defined in the following proto messages.
 
 ```proto
 message Config
@@ -42,7 +43,7 @@ message Parameter
 ```
 
 In addition to this basic information, when you have a PostgreSQL or MySQL
-[database connection configured](../reference/config.html#database)
+[database connection configured](../reference/config.md#database)
 each CEL expression has access to the output from running `EXPLAIN ...` on your query
 via the `postgresql.explain` and `mysql.explain` variables.
 This output is quite complex and depends on the structure of your query but sqlc attempts
@@ -94,7 +95,7 @@ rules:
 The CEL expression environment has two variables containing `EXPLAIN ...` output,
 `postgresql.explain` and `mysql.explain`. `sqlc` only populates the variable associated with
 your configured database engine, and only when you have a
-[database connection configured](../reference/config.html#database).
+[database connection configured](../reference/config.md#database).
 
 For the `postgresql` engine, `sqlc` runs
 
@@ -162,22 +163,27 @@ rules:
   rule: "!has(postgresql.explain)" # A dummy rule to trigger explain
 ```
 
-Please note that `sqlc` does not manage or migrate your database. Use your
-migration tool of choice to create the necessary database tables and objects
-before running `sqlc vet` with rules that depend on `EXPLAIN ...` output.
+Please note that databases configured with a `uri` must have an up-to-date
+schema for `vet` to work correctly, and `sqlc` does not apply schema migrations
+to your database. Use your migration tool of choice to create the necessary
+tables and objects before running `sqlc vet` with rules that depend on
+`EXPLAIN ...` output.
+
+Alternatively, configure [managed databases](managed-databases.md) to have
+`sqlc` create hosted ephemeral databases with the correct schema automatically.
 
 ## Built-in rules
 
 ### sqlc/db-prepare
 
-When a [database](../reference/config.html#database) connection is configured, you can
+When a [database](../reference/config.md#database) connection is configured, you can
 run the built-in `sqlc/db-prepare` rule. This rule will attempt to prepare
 each of your queries against the connected database and report any failures.
 
 ```yaml
 version: 2
 sql:
-  - schema: "query.sql"
+  - schema: "schema.sql"
     queries: "query.sql"
     engine: "postgresql"
     gen:
@@ -190,17 +196,39 @@ sql:
       - sqlc/db-prepare
 ```
 
+Please note that databases configured with a `uri` must have an up-to-date
+schema for `vet` to work correctly, and `sqlc` does not apply schema migrations
+to your database. Use your migration tool of choice to create the necessary
+tables and objects before running `sqlc vet` with the `sqlc/db-prepare` rule.
+
+Alternatively, configure [managed databases](managed-databases.md) to have
+`sqlc` create hosted ephemeral databases with the correct schema automatically.
+
+```yaml
+version: 2
+cloud:
+  project: "<PROJECT_ID>"
+sql:
+  - schema: "schema.sql"
+    queries: "query.sql"
+    engine: "postgresql"
+    gen:
+      go:
+        package: "authors"
+        out: "db"
+    database:
+      managed: true
+    rules:
+      - sqlc/db-prepare
+```
+
 To see this in action, check out the [authors
 example](https://github.com/sqlc-dev/sqlc/blob/main/examples/authors/sqlc.yaml).
-
-Please note that `sqlc` does not manage or migrate your database. Use your
-migration tool of choice to create the necessary database tables and objects
-before running `sqlc vet` with the `sqlc/db-prepare` rule.
 
 ## Running lint rules
 
 When you add the name of a defined rule to the rules list
-for a [sql package](https://docs.sqlc.dev/en/stable/reference/config.html#sql),
+for a [sql package](../reference/config.md#sql),
 `sqlc vet` will evaluate that rule against every query in the package.
 
 In the example below, two rules are defined but only one is enabled.
@@ -231,7 +259,24 @@ rules:
 ### Opting-out of lint rules
 
 For any query, you can tell `sqlc vet` not to evaluate lint rules using the
-`@sqlc-vet-disable` query annotation.
+`@sqlc-vet-disable` query annotation. The annotation accepts a list of rules to ignore.
+
+```sql
+/* name: GetAuthor :one */
+/* @sqlc-vet-disable sqlc/db-prepare no-pg */
+SELECT * FROM authors
+WHERE id = ? LIMIT 1;
+```
+The rules can also be split across lines.
+```sql
+/* name: GetAuthor :one */
+/* @sqlc-vet-disable sqlc/db-prepare */
+/* @sqlc-vet-disable no-pg */
+SELECT * FROM authors
+WHERE id = ? LIMIT 1;
+```
+
+To skip all rules for a query, you can provide the `@sqlc-vet-disable` annotation without any parameters. 
 
 ```sql
 /* name: GetAuthor :one */

@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"os"
 	osexec "os/exec"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,8 +15,25 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/sqlc-dev/sqlc/internal/cmd"
+	"github.com/sqlc-dev/sqlc/internal/config"
 	"github.com/sqlc-dev/sqlc/internal/opts"
+	"github.com/sqlc-dev/sqlc/internal/sqltest/docker"
+	"github.com/sqlc-dev/sqlc/internal/sqltest/native"
 )
+
+func lineEndings() cmp.Option {
+	return cmp.Transformer("LineEndings", func(in string) string {
+		// Replace Windows new lines with Unix newlines
+		return strings.Replace(in, "\r\n", "\n", -1)
+	})
+}
+
+func stderrTransformer() cmp.Option {
+	return cmp.Transformer("Stderr", func(in string) string {
+		s := strings.Replace(in, "\r", "", -1)
+		return strings.Replace(s, "\\", "/", -1)
+	})
+}
 
 func TestExamples(t *testing.T) {
 	t.Parallel()
@@ -40,7 +58,11 @@ func TestExamples(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(examples, tc)
 			var stderr bytes.Buffer
-			output, err := cmd.Generate(ctx, cmd.Env{}, path, "", &stderr)
+			opts := &cmd.Options{
+				Env:    cmd.Env{},
+				Stderr: &stderr,
+			}
+			output, err := cmd.Generate(ctx, path, "", opts)
 			if err != nil {
 				t.Fatalf("sqlc generate failed: %s", stderr.String())
 			}
@@ -68,10 +90,19 @@ func BenchmarkExamples(b *testing.B) {
 			path := filepath.Join(examples, tc)
 			for i := 0; i < b.N; i++ {
 				var stderr bytes.Buffer
-				cmd.Generate(ctx, cmd.Env{}, path, "", &stderr)
+				opts := &cmd.Options{
+					Env:    cmd.Env{},
+					Stderr: &stderr,
+				}
+				cmd.Generate(ctx, path, "", opts)
 			}
 		})
 	}
+}
+
+type textContext struct {
+	Mutate  func(*testing.T, string) func(*config.Config)
+	Enabled func() bool
 }
 
 func TestReplay(t *testing.T) {
@@ -79,68 +110,195 @@ func TestReplay(t *testing.T) {
 	// end-to-end tests
 	os.Setenv("SQLC_DUMMY_VALUE", "true")
 
-	t.Parallel()
+	// t.Parallel()
 	ctx := context.Background()
-	var dirs []string
-	err := filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.Name() == "sqlc.json" || info.Name() == "sqlc.yaml" {
-			dirs = append(dirs, filepath.Dir(path))
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+
+	var mysqlURI, postgresURI string
+
+	// First, check environment variables
+	if uri := os.Getenv("POSTGRESQL_SERVER_URI"); uri != "" {
+		postgresURI = uri
 	}
-	for _, replay := range dirs {
-		tc := replay
-		t.Run(tc, func(t *testing.T) {
-			t.Parallel()
+	if uri := os.Getenv("MYSQL_SERVER_URI"); uri != "" {
+		mysqlURI = uri
+	}
 
-			var stderr bytes.Buffer
-			var output map[string]string
-			var err error
-
-			path, _ := filepath.Abs(tc)
-			args := parseExec(t, path)
-			expected := expectedStderr(t, path)
-
-			if args.Process != "" {
-				_, err := osexec.LookPath(args.Process)
+	// Try Docker for any missing databases
+	if postgresURI == "" || mysqlURI == "" {
+		if err := docker.Installed(); err == nil {
+			if postgresURI == "" {
+				host, err := docker.StartPostgreSQLServer(ctx)
 				if err != nil {
-					t.Skipf("executable not found: %s %s", args.Process, err)
+					t.Logf("docker postgresql startup failed: %s", err)
+				} else {
+					postgresURI = host
 				}
 			}
-
-			env := cmd.Env{
-				Debug:    opts.DebugFromString(args.Env["SQLCDEBUG"]),
-				NoRemote: true,
-			}
-			switch args.Command {
-			case "diff":
-				err = cmd.Diff(ctx, env, path, "", &stderr)
-			case "generate":
-				output, err = cmd.Generate(ctx, env, path, "", &stderr)
-				if err == nil {
-					cmpDirectory(t, path, output)
+			if mysqlURI == "" {
+				host, err := docker.StartMySQLServer(ctx)
+				if err != nil {
+					t.Logf("docker mysql startup failed: %s", err)
+				} else {
+					mysqlURI = host
 				}
-			case "vet":
-				err = cmd.Vet(ctx, env, path, "", &stderr)
-			default:
-				t.Fatalf("unknown command")
 			}
+		}
+	}
 
-			if len(expected) == 0 && err != nil {
-				t.Fatalf("sqlc %s failed: %s", args.Command, stderr.String())
+	// Try native installation for any missing databases (Linux only)
+	if postgresURI == "" || mysqlURI == "" {
+		if err := native.Supported(); err == nil {
+			if postgresURI == "" {
+				host, err := native.StartPostgreSQLServer(ctx)
+				if err != nil {
+					t.Logf("native postgresql startup failed: %s", err)
+				} else {
+					postgresURI = host
+				}
 			}
+			if mysqlURI == "" {
+				host, err := native.StartMySQLServer(ctx)
+				if err != nil {
+					t.Logf("native mysql startup failed: %s", err)
+				} else {
+					mysqlURI = host
+				}
+			}
+		}
+	}
 
-			if diff := cmp.Diff(expected, stderr.String()); diff != "" {
-				t.Errorf("stderr differed (-want +got):\n%s", diff)
-			}
-		})
+	// Log which databases are available
+	t.Logf("PostgreSQL available: %v (URI: %s)", postgresURI != "", postgresURI)
+	t.Logf("MySQL available: %v (URI: %s)", mysqlURI != "", mysqlURI)
+
+	contexts := map[string]textContext{
+		"base": {
+			Mutate:  func(t *testing.T, path string) func(*config.Config) { return func(c *config.Config) {} },
+			Enabled: func() bool { return true },
+		},
+		"managed-db": {
+			Mutate: func(t *testing.T, path string) func(*config.Config) {
+				return func(c *config.Config) {
+					// Add all servers - tests will fail if database isn't available
+					c.Servers = []config.Server{
+						{
+							Name:   "postgres",
+							Engine: config.EnginePostgreSQL,
+							URI:    postgresURI,
+						},
+						{
+							Name:   "mysql",
+							Engine: config.EngineMySQL,
+							URI:    mysqlURI,
+						},
+					}
+
+					for i := range c.SQL {
+						switch c.SQL[i].Engine {
+						case config.EnginePostgreSQL:
+							c.SQL[i].Database = &config.Database{
+								Managed: true,
+							}
+						case config.EngineMySQL:
+							c.SQL[i].Database = &config.Database{
+								Managed: true,
+							}
+						case config.EngineSQLite:
+							c.SQL[i].Database = &config.Database{
+								Managed: true,
+							}
+						default:
+							// pass
+						}
+					}
+				}
+			},
+			Enabled: func() bool {
+				// Enabled if at least one database URI is available
+				return postgresURI != "" || mysqlURI != ""
+			},
+		},
+	}
+
+	for name, testctx := range contexts {
+		name := name
+		testctx := testctx
+
+		if !testctx.Enabled() {
+			continue
+		}
+
+		for _, replay := range FindTests(t, "testdata", name) {
+			tc := replay
+			t.Run(filepath.Join(name, tc.Name), func(t *testing.T) {
+				var stderr bytes.Buffer
+				var output map[string]string
+				var err error
+
+				path, _ := filepath.Abs(tc.Path)
+				args := tc.Exec
+				if args == nil {
+					args = &Exec{Command: "generate"}
+				}
+				expected := string(tc.Stderr)
+
+				if args.Process != "" {
+					_, err := osexec.LookPath(args.Process)
+					if err != nil {
+						t.Skipf("executable not found: %s %s", args.Process, err)
+					}
+				}
+
+				if len(args.Contexts) > 0 {
+					if !slices.Contains(args.Contexts, name) {
+						t.Skipf("unsupported context: %s", name)
+					}
+				}
+
+				if len(args.OS) > 0 {
+					if !slices.Contains(args.OS, runtime.GOOS) {
+						t.Skipf("unsupported os: %s", runtime.GOOS)
+					}
+				}
+
+				opts := cmd.Options{
+					Env: cmd.Env{
+						Debug:      opts.DebugFromString(args.Env["SQLCDEBUG"]),
+						Experiment: opts.ExperimentFromString(args.Env["SQLCEXPERIMENT"]),
+						NoRemote:   true,
+					},
+					Stderr:       &stderr,
+					MutateConfig: testctx.Mutate(t, path),
+				}
+
+				switch args.Command {
+				case "diff":
+					err = cmd.Diff(ctx, path, "", &opts)
+				case "generate":
+					output, err = cmd.Generate(ctx, path, "", &opts)
+					if err == nil {
+						cmpDirectory(t, path, output)
+					}
+				case "vet":
+					err = cmd.Vet(ctx, path, "", &opts)
+				default:
+					t.Fatalf("unknown command")
+				}
+
+				if len(expected) == 0 && err != nil {
+					t.Fatalf("sqlc %s failed: %s", args.Command, stderr.String())
+				}
+
+				diff := cmp.Diff(
+					strings.TrimSpace(expected),
+					strings.TrimSpace(stderr.String()),
+					stderrTransformer(),
+				)
+				if diff != "" {
+					t.Fatalf("stderr differed (-want +got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 
@@ -188,60 +346,24 @@ func cmpDirectory(t *testing.T, dir string, actual map[string]string) {
 		t.Fatal(err)
 	}
 
-	if !cmp.Equal(expected, actual, cmpopts.EquateEmpty()) {
+	opts := []cmp.Option{
+		cmpopts.EquateEmpty(),
+		lineEndings(),
+	}
+
+	if !cmp.Equal(expected, actual, opts...) {
 		t.Errorf("%s contents differ", dir)
 		for name, contents := range expected {
 			name := name
-			tn := strings.Replace(name, dir+"/", "", -1)
-			t.Run(tn, func(t *testing.T) {
-				if actual[name] == "" {
-					t.Errorf("%s is empty", name)
-					return
-				}
-				if diff := cmp.Diff(contents, actual[name]); diff != "" {
-					t.Errorf("%s differed (-want +got):\n%s", name, diff)
-				}
-			})
+			if actual[name] == "" {
+				t.Errorf("%s is empty", name)
+				return
+			}
+			if diff := cmp.Diff(contents, actual[name], opts...); diff != "" {
+				t.Errorf("%s differed (-want +got):\n%s", name, diff)
+			}
 		}
 	}
-}
-
-func expectedStderr(t *testing.T, dir string) string {
-	t.Helper()
-	path := filepath.Join(dir, "stderr.txt")
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		blob, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return string(blob)
-	}
-	return ""
-}
-
-type exec struct {
-	Command string            `json:"command"`
-	Process string            `json:"process"`
-	Env     map[string]string `json:"env"`
-}
-
-func parseExec(t *testing.T, dir string) exec {
-	t.Helper()
-	var e exec
-	path := filepath.Join(dir, "exec.json")
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		blob, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := json.Unmarshal(blob, &e); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if e.Command == "" {
-		e.Command = "generate"
-	}
-	return e
 }
 
 func BenchmarkReplay(b *testing.B) {
@@ -251,7 +373,7 @@ func BenchmarkReplay(b *testing.B) {
 		if err != nil {
 			return err
 		}
-		if info.Name() == "sqlc.json" || info.Name() == "sqlc.yaml" {
+		if info.Name() == "sqlc.json" || info.Name() == "sqlc.yaml" || info.Name() == "sqlc.yml" {
 			dirs = append(dirs, filepath.Dir(path))
 			return filepath.SkipDir
 		}
@@ -266,7 +388,11 @@ func BenchmarkReplay(b *testing.B) {
 			path, _ := filepath.Abs(tc)
 			for i := 0; i < b.N; i++ {
 				var stderr bytes.Buffer
-				cmd.Generate(ctx, cmd.Env{}, path, "", &stderr)
+				opts := &cmd.Options{
+					Env:    cmd.Env{},
+					Stderr: &stderr,
+				}
+				cmd.Generate(ctx, path, "", opts)
 			}
 		})
 	}

@@ -1,10 +1,7 @@
-//go:build !windows && cgo
-// +build !windows,cgo
-
 package postgresql
 
 import (
-	nodes "github.com/pganalyze/pg_query_go/v4"
+	nodes "github.com/pganalyze/pg_query_go/v6"
 )
 
 func isArray(n *nodes.TypeName) bool {

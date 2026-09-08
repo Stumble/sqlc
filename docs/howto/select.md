@@ -8,11 +8,26 @@ CREATE TABLE authors (
   bio        text   NOT NULL,
   birth_year int    NOT NULL
 );
+```
 
+The parameter syntax varies by database engine:
 
+**PostgreSQL:**
+```sql
 -- name: GetAuthor :one
 SELECT * FROM authors
 WHERE id = $1;
+
+-- name: ListAuthors :many
+SELECT * FROM authors
+ORDER BY id;
+```
+
+**MySQL and SQLite:**
+```sql
+-- name: GetAuthor :one
+SELECT * FROM authors
+WHERE id = ?;
 
 -- name: ListAuthors :many
 SELECT * FROM authors
@@ -125,7 +140,7 @@ SELECT bio, birth_year FROM authors
 WHERE id = $1;
 ```
 
-When selecting a single column, only that value that returned. The `GetBioForAuthor`
+When selecting a single column, only that value is returned. The `GetBioForAuthor`
 method takes a single `int` as an argument and returns a `string` and an
 `error`.
 

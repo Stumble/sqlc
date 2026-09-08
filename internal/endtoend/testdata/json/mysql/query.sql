@@ -1,7 +1,5 @@
-CREATE TABLE foo (
-    a json not null,
-    b json
-);
-
 -- name: SelectFoo :exec
 SELECT * FROM foo;
+
+-- name: BulkInsert :copyfrom
+INSERT INTO foo (a, b) VALUES (?, ?);

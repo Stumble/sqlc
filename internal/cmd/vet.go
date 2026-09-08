@@ -6,36 +6,39 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sqlc-dev/sqlc/internal/constants"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime/trace"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/ext"
 	"github.com/jackc/pgx/v5"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/sqlc-dev/sqlc/internal/config"
+	"github.com/sqlc-dev/sqlc/internal/dbmanager"
 	"github.com/sqlc-dev/sqlc/internal/debug"
+	"github.com/sqlc-dev/sqlc/internal/migrations"
 	"github.com/sqlc-dev/sqlc/internal/opts"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
+	"github.com/sqlc-dev/sqlc/internal/quickdb"
 	"github.com/sqlc-dev/sqlc/internal/shfmt"
+	"github.com/sqlc-dev/sqlc/internal/sql/sqlpath"
 	"github.com/sqlc-dev/sqlc/internal/vet"
 )
 
 var ErrFailedChecks = errors.New("failed checks")
 
 var pjson = protojson.UnmarshalOptions{AllowPartial: true, DiscardUnknown: true}
-
-const RuleDbPrepare = "sqlc/db-prepare"
-const QueryFlagSqlcVetDisable = "@sqlc-vet-disable"
 
 func NewCmdVet() *cobra.Command {
 	return &cobra.Command{
@@ -44,8 +47,12 @@ func NewCmdVet() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer trace.StartRegion(cmd.Context(), "vet").End()
 			stderr := cmd.ErrOrStderr()
+			opts := &Options{
+				Env:    ParseEnv(cmd),
+				Stderr: stderr,
+			}
 			dir, name := getConfigPath(stderr, cmd.Flag("file"))
-			if err := Vet(cmd.Context(), ParseEnv(cmd), dir, name, stderr); err != nil {
+			if err := Vet(cmd.Context(), dir, name, opts); err != nil {
 				if !errors.Is(err, ErrFailedChecks) {
 					fmt.Fprintf(stderr, "%s\n", err)
 				}
@@ -56,7 +63,9 @@ func NewCmdVet() *cobra.Command {
 	}
 }
 
-func Vet(ctx context.Context, e Env, dir, filename string, stderr io.Writer) error {
+func Vet(ctx context.Context, dir, filename string, opts *Options) error {
+	e := opts.Env
+	stderr := opts.Stderr
 	configPath, conf, err := readConfig(stderr, dir, filename)
 	if err != nil {
 		return err
@@ -100,7 +109,7 @@ func Vet(ctx context.Context, e Env, dir, filename string, stderr io.Writer) err
 	}
 
 	rules := map[string]rule{
-		RuleDbPrepare: {NeedsPrepare: true},
+		constants.QueryRuleDbPrepare: {NeedsPrepare: true},
 	}
 
 	for _, c := range conf.Rules {
@@ -134,13 +143,13 @@ func Vet(ctx context.Context, e Env, dir, filename string, stderr io.Writer) err
 	}
 
 	c := checker{
-		Rules:      rules,
-		Conf:       conf,
-		Dir:        dir,
-		Env:        env,
-		Envmap:     map[string]string{},
-		Stderr:     stderr,
-		NoDatabase: e.NoDatabase,
+		Rules:         rules,
+		Conf:          conf,
+		Dir:           dir,
+		Env:           env,
+		Stderr:        stderr,
+		OnlyManagedDB: e.Debug.OnlyManagedDatabases,
+		Replacer:      shfmt.NewReplacer(nil),
 	}
 	errored := false
 	for _, sql := range conf.SQL {
@@ -324,7 +333,9 @@ type dbPreparer struct {
 
 func (p *dbPreparer) Prepare(ctx context.Context, name, query string) error {
 	s, err := p.db.PrepareContext(ctx, query)
-	s.Close()
+	if s != nil {
+		s.Close()
+	}
 	return err
 }
 
@@ -369,24 +380,86 @@ type rule struct {
 }
 
 type checker struct {
-	Rules      map[string]rule
-	Conf       *config.Config
-	Dir        string
-	Env        *cel.Env
-	Envmap     map[string]string
-	Stderr     io.Writer
-	NoDatabase bool
+	Rules         map[string]rule
+	Conf          *config.Config
+	Dir           string
+	Env           *cel.Env
+	Stderr        io.Writer
+	OnlyManagedDB bool
+	Client        dbmanager.Client
+	clientOnce    sync.Once
+	Replacer      *shfmt.Replacer
+}
+
+// isInMemorySQLite checks if a SQLite URI refers to an in-memory database
+func isInMemorySQLite(uri string) bool {
+	if uri == ":memory:" || uri == "" {
+		return true
+	}
+	// Check for file URI with mode=memory parameter
+	// e.g., "file:test?mode=memory&cache=shared"
+	if strings.Contains(uri, "mode=memory") {
+		return true
+	}
+	return false
+}
+
+func (c *checker) fetchDatabaseUri(ctx context.Context, s config.SQL) (string, func() error, error) {
+	cleanup := func() error {
+		return nil
+	}
+
+	if s.Database == nil {
+		panic("fetch database URI called with nil database")
+	}
+	if !s.Database.Managed {
+		uri, err := c.DSN(s.Database.URI)
+		return uri, cleanup, err
+	}
+
+	// Initialize the client exactly once, even if called concurrently
+	c.clientOnce.Do(func() {
+		c.Client = dbmanager.NewClient(c.Conf.Servers)
+	})
+
+	var ddl []string
+	files, err := sqlpath.Glob(s.Schema)
+	if err != nil {
+		return "", cleanup, err
+	}
+	for _, schema := range files {
+		contents, err := os.ReadFile(schema)
+		if err != nil {
+			return "", cleanup, fmt.Errorf("read file: %w", err)
+		}
+		ddl = append(ddl, migrations.RemoveRollbackStatements(string(contents)))
+	}
+
+	resp, err := c.Client.CreateDatabase(ctx, &dbmanager.CreateDatabaseRequest{
+		Engine:     string(s.Engine),
+		Migrations: ddl,
+	})
+	if err != nil {
+		return "", cleanup, fmt.Errorf("managed: create database: %w", err)
+	}
+
+	var uri string
+	switch s.Engine {
+	case config.EngineMySQL:
+		dburi, err := quickdb.MySQLReformatURI(resp.Uri)
+		if err != nil {
+			return "", cleanup, fmt.Errorf("reformat uri: %w", err)
+		}
+		uri = dburi
+	default:
+		uri = resp.Uri
+	}
+
+	return uri, cleanup, nil
 }
 
 func (c *checker) DSN(dsn string) (string, error) {
-	// Populate the environment variable map if it is empty
-	if len(c.Envmap) == 0 {
-		for _, e := range os.Environ() {
-			k, v, _ := strings.Cut(e, "=")
-			c.Envmap[k] = v
-		}
-	}
-	return shfmt.Replace(dsn, c.Envmap), nil
+	return c.Replacer.Replace(dsn), nil
 }
 
 func (c *checker) checkSQL(ctx context.Context, s config.SQL) error {
@@ -419,13 +492,19 @@ func (c *checker) checkSQL(ctx context.Context, s config.SQL) error {
 	var prep preparer
 	var expl explainer
 	if s.Database != nil { // TODO only set up a database connection if a rule evaluation requires it
-		if c.NoDatabase {
-			return fmt.Errorf("database: connections disabled via command line flag")
+		if s.Database.URI != "" && c.OnlyManagedDB {
+			return fmt.Errorf("database: connections disabled via SQLCDEBUG=databases=managed")
 		}
-		dburl, err := c.DSN(s.Database.URI)
+		dburl, cleanup, err := c.fetchDatabaseUri(ctx, s)
 		if err != nil {
 			return err
 		}
+		defer func() {
+			if err := cleanup(); err != nil {
+				fmt.Fprintf(c.Stderr, "error cleaning up: %s\n", err)
+			}
+		}()
+
 		switch s.Engine {
 		case config.EnginePostgreSQL:
 			conn, err := pgx.Connect(ctx, dburl)
@@ -459,6 +538,23 @@ func (c *checker) checkSQL(ctx context.Context, s config.SQL) error {
 				return fmt.Errorf("database: connection error: %s", err)
 			}
 			defer db.Close()
+			// For in-memory SQLite databases, apply migrations
+			if isInMemorySQLite(dburl) {
+				files, err := sqlpath.Glob(s.Schema)
+				if err != nil {
+					return fmt.Errorf("schema: %w", err)
+				}
+				for _, schema := range files {
+					contents, err := os.ReadFile(schema)
+					if err != nil {
+						return fmt.Errorf("read schema file: %w", err)
+					}
+					ddl := migrations.RemoveRollbackStatements(string(contents))
+					if _, err := db.ExecContext(ctx, ddl); err != nil {
+						return fmt.Errorf("apply schema %s: %w", schema, err)
+					}
+				}
+			}
 			prep = &dbPreparer{db}
 			// SQLite really doesn't want us to depend on the output of EXPLAIN
 			// QUERY PLAN: https://www.sqlite.org/eqp.html
@@ -472,11 +568,23 @@ func (c *checker) checkSQL(ctx context.Context, s config.SQL) error {
 	req := codeGenRequest(result, combo)
 	cfg := vetConfig(req)
 	for i, query := range req.Queries {
-		if result.Queries[i].Flags[QueryFlagSqlcVetDisable] {
-			if debug.Active {
-				log.Printf("Skipping vet rules for query: %s\n", query.Name)
+		md := result.Queries[i].Metadata
+		if md.Flags[constants.QueryFlagSqlcVetDisable] {
+			// If the vet disable flag is specified without any rules listed, all rules are ignored.
+			if len(md.RuleSkiplist) == 0 {
+				if debug.Active {
+					log.Printf("Skipping all vet rules for query: %s\n", query.Name)
+				}
+				continue
 			}
-			continue
+
+			// Rules which are listed to be disabled but not declared in the config file are rejected.
+			for r := range md.RuleSkiplist {
+				if !slices.Contains(s.Rules, r) {
+					fmt.Fprintf(c.Stderr, "%s: %s: rule-check error: rule %q does not exist in the config file\n", query.Filename, query.Name, r)
+					errored = true
+				}
+			}
 		}
 
 		evalMap := map[string]any{
@@ -485,81 +593,88 @@ func (c *checker) checkSQL(ctx context.Context, s config.SQL) error {
 		}
 
 		for _, name := range s.Rules {
-			rule, ok := c.Rules[name]
-			if !ok {
-				return fmt.Errorf("type-check error: a rule with the name '%s' does not exist", name)
-			}
+			if _, skip := md.RuleSkiplist[name]; skip {
+				if debug.Active {
+					log.Printf("Skipping vet rule %q for query: %s\n", name, query.Name)
+				}
+			} else {
+				rule, ok := c.Rules[name]
+				if !ok {
+					return fmt.Errorf("type-check error: a rule with the name '%s' does not exist", name)
+				}
 
-			if rule.NeedsPrepare {
-				if prep == nil {
-					fmt.Fprintf(c.Stderr, "%s: %s: %s: error preparing query: database connection required\n", query.Filename, query.Name, name)
-					errored = true
+				if rule.NeedsPrepare {
+					if prep == nil {
+						fmt.Fprintf(c.Stderr, "%s: %s: %s: error preparing query: database connection required\n", query.Filename, query.Name, name)
+						errored = true
+						continue
+					}
+					prepName := fmt.Sprintf("sqlc_vet_%d_%d", time.Now().Unix(), i)
+					if err := prep.Prepare(ctx, prepName, query.Text); err != nil {
+						fmt.Fprintf(c.Stderr, "%s: %s: %s: error preparing query: %s\n", query.Filename, query.Name, name, err)
+						errored = true
+						continue
+					}
+				}
+
+				// short-circuit for "sqlc/db-prepare" rule which doesn't have a CEL program
+				if rule.Program == nil {
 					continue
 				}
-				prepName := fmt.Sprintf("sqlc_vet_%d_%d", time.Now().Unix(), i)
-				if err := prep.Prepare(ctx, prepName, query.Text); err != nil {
-					fmt.Fprintf(c.Stderr, "%s: %s: %s: error preparing query: %s\n", query.Filename, query.Name, name, err)
-					errored = true
-					continue
-				}
-			}
 
-			// short-circuit for "sqlc/db-prepare" rule which doesn't have a CEL program
-			if rule.Program == nil {
-				continue
-			}
+				// Get explain output for this query if we need it
+				_, pgsqlOK := evalMap["postgresql"]
+				_, mysqlOK := evalMap["mysql"]
+				if rule.NeedsExplain && !(pgsqlOK || mysqlOK) {
+					if expl == nil {
+						fmt.Fprintf(c.Stderr, "%s: %s: %s: error explaining query: database connection required\n", query.Filename, query.Name, name)
+						errored = true
+						continue
+					}
+					engineOutput, err := expl.Explain(ctx, query.Text, query.Params...)
+					if err != nil {
+						fmt.Fprintf(c.Stderr, "%s: %s: %s: error explaining query: %s\n", query.Filename, query.Name, name, err)
+						errored = true
+						continue
+					}
 
-			// Get explain output for this query if we need it
-			_, pgsqlOK := evalMap["postgresql"]
-			_, mysqlOK := evalMap["mysql"]
-			if rule.NeedsExplain && !(pgsqlOK || mysqlOK) {
-				if expl == nil {
-					fmt.Fprintf(c.Stderr, "%s: %s: %s: error explaining query: database connection required\n", query.Filename, query.Name, name)
-					errored = true
-					continue
+					evalMap["postgresql"] = engineOutput.PostgreSQL
+					evalMap["mysql"] = engineOutput.MySQL
 				}
-				engineOutput, err := expl.Explain(ctx, query.Text, query.Params...)
+
+				if debug.Debug.DumpVetEnv {
+					fmt.Printf("vars for rule '%s' evaluating against query '%s':\n", name, query.Name)
+					debug.DumpAsJSON(evalMap)
+				}
+
+				out, _, err := (*rule.Program).Eval(evalMap)
 				if err != nil {
-					fmt.Fprintf(c.Stderr, "%s: %s: %s: error explaining query: %s\n", query.Filename, query.Name, name, err)
+					return err
+				}
+				tripped, ok := out.Value().(bool)
+				if !ok {
+					return fmt.Errorf("expression returned non-bool value: %v", out.Value())
+				}
+				if tripped {
+					// TODO: Get line numbers in the output
+					if rule.Message == "" {
+						fmt.Fprintf(c.Stderr, "%s: %s: %s\n", query.Filename, query.Name, name)
+					} else {
+						fmt.Fprintf(c.Stderr, "%s: %s: %s: %s\n", query.Filename, query.Name, name, rule.Message)
+					}
 					errored = true
-					continue
 				}
-
-				evalMap["postgresql"] = engineOutput.PostgreSQL
-				evalMap["mysql"] = engineOutput.MySQL
-			}
-
-			if debug.Debug.DumpVetEnv {
-				fmt.Printf("vars for rule '%s' evaluating against query '%s':\n", name, query.Name)
-				debug.DumpAsJSON(evalMap)
-			}
-
-			out, _, err := (*rule.Program).Eval(evalMap)
-			if err != nil {
-				return err
-			}
-			tripped, ok := out.Value().(bool)
-			if !ok {
-				return fmt.Errorf("expression returned non-bool value: %v", out.Value())
-			}
-			if tripped {
-				// TODO: Get line numbers in the output
-				if rule.Message == "" {
-					fmt.Fprintf(c.Stderr, "%s: %s: %s\n", query.Filename, query.Name, name)
-				} else {
-					fmt.Fprintf(c.Stderr, "%s: %s: %s: %s\n", query.Filename, query.Name, name, rule.Message)
-				}
-				errored = true
 			}
 		}
 	}
+
 	if errored {
 		return ErrFailedChecks
 	}
 	return nil
 }
 
-func vetConfig(req *plugin.CodeGenRequest) *vet.Config {
+func vetConfig(req *plugin.GenerateRequest) *vet.Config {
 	return &vet.Config{
 		Version: req.Settings.Version,
 		Engine:  req.Settings.Engine,

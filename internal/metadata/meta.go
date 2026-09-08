@@ -1,15 +1,29 @@
 package metadata
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/sqlc-dev/sqlc/internal/constants"
 	"strings"
 	"unicode"
+
+	"github.com/sqlc-dev/sqlc/internal/source"
 )
 
-type CommentSyntax struct {
-	Dash      bool
-	Hash      bool
-	SlashStar bool
+type CommentSyntax source.CommentSyntax
+
+type Metadata struct {
+	Name     string
+	Cmd      string
+	Comments []string
+	Params   map[string]string
+	Flags    map[string]bool
+
+	// RuleSkiplist contains the names of rules to disable vetting for.
+	// If the map is empty, but the disable vet flag is specified, then all rules are ignored.
+	RuleSkiplist map[string]struct{}
+
+	Filename string
 }
 
 const (
@@ -44,17 +58,7 @@ func validateQueryName(name string) error {
 	return nil
 }
 
-type QueryConfig struct {
-	Name    string
-	Cmd     string
-	Options map[string]string
-}
-
-// Parse returns query name and the specified return type.
-func ParseQueryNameAndType(t string, commentStyle CommentSyntax) (*QueryConfig, error) {
-	config := &QueryConfig{
-		Options: make(map[string]string),
-	}
+func ParseQueryNameAndType(t string, commentStyle CommentSyntax) (string, string, error) {
 	for _, line := range strings.Split(t, "\n") {
 		var prefix string
 		if strings.HasPrefix(line, "--") {
@@ -78,72 +82,91 @@ func ParseQueryNameAndType(t string, commentStyle CommentSyntax) (*QueryConfig, 
 		if prefix == "" {
 			continue
 		}
-
-		// comments body
-		body := line[len(prefix):]
-		if prefix == "/*" {
-			body = body[:len(body)-1] // removes the trailing "*/" element
-		}
-		body = strings.TrimSpace(body)
-
-		if strings.HasPrefix(body, "name:") {
-			// original	query comments.
-			part := strings.Split(strings.TrimSpace(line), " ")
-			if len(part) == 2 {
-				return nil, fmt.Errorf("missing query type [':one', ':many', ':exec', ':execrows', ':execlastid', ':execresult', ':copyfrom', 'batchexec', 'batchmany', 'batchone']: %s", line)
-			}
-			if len(part) != 4 {
-				return nil, fmt.Errorf("invalid query comment: %s", line)
-			}
-			queryName := part[2]
-			queryType := strings.TrimSpace(part[3])
-			switch queryType {
-			case CmdOne, CmdMany, CmdExec, CmdExecResult, CmdExecRows, CmdExecLastId, CmdCopyFrom, CmdBatchExec, CmdBatchMany, CmdBatchOne:
-			default:
-				return nil, fmt.Errorf("invalid query type: %s", queryType)
-			}
-			if err := validateQueryName(queryName); err != nil {
-				return nil, err
-			}
-			config.Name = queryName
-			config.Cmd = queryType
-		} else if strings.HasPrefix(body, "--") {
-			body = body[2:] // trim "--"
-			// expecting a key value pair of this format: "key:value"
-			sepIndex := strings.Index(body, ":")
-			if sepIndex == -1 {
-				return nil, fmt.Errorf("invalid query option string: %s", line)
-			}
-			key := strings.TrimSpace(body[:sepIndex])
-			val := strings.TrimSpace(body[sepIndex+1:])
-			config.Options[key] = val
-		} else {
-			// to be consistent with previous logic: if comments start with name
-			// and have ":", it must start with "name:".
-			// TODO(yumin): is this necessary?
-			if strings.HasPrefix(body, "name") && strings.Contains(body, ":") {
-				return nil, fmt.Errorf("invalid metadata: %s", line)
-			}
+		rest := line[len(prefix):]
+		if !strings.HasPrefix(strings.TrimSpace(rest), "name") {
 			continue
 		}
+		if !strings.Contains(rest, ":") {
+			continue
+		}
+		if !strings.HasPrefix(rest, " name: ") {
+			return "", "", fmt.Errorf("invalid metadata: %s", line)
+		}
 
+		part := strings.Split(strings.TrimSpace(line), " ")
+		if prefix == "/*" {
+			part = part[:len(part)-1] // removes the trailing "*/" element
+		}
+		if len(part) == 3 {
+			return "", "", fmt.Errorf("missing query type [':one', ':many', ':exec', ':execrows', ':execlastid', ':execresult', ':copyfrom', 'batchexec', 'batchmany', 'batchone']: %s", line)
+		}
+		if len(part) != 4 {
+			return "", "", fmt.Errorf("invalid query comment: %s", line)
+		}
+		queryName := part[2]
+		queryType := strings.TrimSpace(part[3])
+		switch queryType {
+		case CmdOne, CmdMany, CmdExec, CmdExecResult, CmdExecRows, CmdExecLastId, CmdCopyFrom, CmdBatchExec, CmdBatchMany, CmdBatchOne:
+		default:
+			return "", "", fmt.Errorf("invalid query type: %s", queryType)
+		}
+		if err := validateQueryName(queryName); err != nil {
+			return "", "", err
+		}
+		return queryName, queryType, nil
 	}
-	return config, nil
+	return "", "", nil
 }
 
-func ParseQueryFlags(comments []string) (map[string]bool, error) {
+// ParseCommentFlags processes the comments provided with queries to determine the metadata params, flags and rules to skip.
+// All flags in query comments are prefixed with `@`, e.g. @param, @@sqlc-vet-disable.
+func ParseCommentFlags(comments []string) (map[string]string, map[string]bool, map[string]struct{}, error) {
+	params := make(map[string]string)
 	flags := make(map[string]bool)
+	ruleSkiplist := make(map[string]struct{})
+
 	for _, line := range comments {
-		cleanLine := strings.TrimPrefix(line, "--")
-		cleanLine = strings.TrimPrefix(cleanLine, "/*")
-		cleanLine = strings.TrimPrefix(cleanLine, "#")
-		cleanLine = strings.TrimSuffix(cleanLine, "*/")
-		cleanLine = strings.TrimSpace(cleanLine)
-		if strings.HasPrefix(cleanLine, "@") {
-			flagName := strings.SplitN(cleanLine, " ", 2)[0]
-			flags[flagName] = true
+		s := bufio.NewScanner(strings.NewReader(line))
+		s.Split(bufio.ScanWords)
+
+		s.Scan()
+		token := s.Text()
+
+		if !strings.HasPrefix(token, "@") {
 			continue
 		}
+
+		switch token {
+		case constants.QueryFlagParam:
+			s.Scan()
+			name := s.Text()
+			var rest []string
+			for s.Scan() {
+				paramToken := s.Text()
+				rest = append(rest, paramToken)
+			}
+			params[name] = strings.Join(rest, " ")
+
+		case constants.QueryFlagSqlcVetDisable:
+			flags[token] = true
+
+			// Vet rules can all be disabled in the same line or split across lines .i.e.
+			// /* @sqlc-vet-disable sqlc/db-prepare delete-without-where */
+			// is equivalent to:
+			// /* @sqlc-vet-disable sqlc/db-prepare */
+			// /* @sqlc-vet-disable delete-without-where */
+			for s.Scan() {
+				ruleSkiplist[s.Text()] = struct{}{}
+			}
+
+		default:
+			flags[token] = true
+		}
+
+		if s.Err() != nil {
+			return params, flags, ruleSkiplist, s.Err()
+		}
 	}
-	return flags, nil
+
+	return params, flags, ruleSkiplist, nil
 }

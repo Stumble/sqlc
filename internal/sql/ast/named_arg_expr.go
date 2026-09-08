@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/sqlc-dev/sqlc/internal/sql/format"
+
 type NamedArgExpr struct {
 	Xpr       Node
 	Arg       Node
@@ -10,4 +12,15 @@ type NamedArgExpr struct {
 
 func (n *NamedArgExpr) Pos() int {
 	return n.Location
+}
+
+func (n *NamedArgExpr) Format(buf *TrackedBuffer, d format.Dialect) {
+	if n == nil {
+		return
+	}
+	if n.Name != nil {
+		buf.WriteString(*n.Name)
+	}
+	buf.WriteString(" => ")
+	buf.astFormat(n.Arg, d)
 }

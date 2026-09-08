@@ -1,5 +1,3 @@
-CREATE TABLE foo (id text not null);
-
 -- name: ListFoos
 SELECT id FROM foo;
 
@@ -16,4 +14,7 @@ DELETE FROM foo WHERE id = $1;
 UPDATE foo SET id = $2 WHERE id = $1;
 
 -- name: InsertFoo :one
+INSERT INTO foo (id) VALUES ($1);
+
+-- name: InsertFoo :batchone
 INSERT INTO foo (id) VALUES ($1);

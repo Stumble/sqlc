@@ -1,80 +1,40 @@
 package bundler
 
 import (
-	"io"
-	"mime/multipart"
 	"os"
 	"path/filepath"
 
-	"github.com/sqlc-dev/sqlc/internal/config"
+	pb "github.com/sqlc-dev/sqlc/internal/quickdb/v1"
 	"github.com/sqlc-dev/sqlc/internal/sql/sqlpath"
 )
 
-func writeInputs(w *multipart.Writer, file string, conf *config.Config) error {
-	refs := map[string]struct{}{}
-	refs[filepath.Base(file)] = struct{}{}
-
-	for _, pkg := range conf.SQL {
-		for _, paths := range []config.Paths{pkg.Schema, pkg.Queries} {
-			files, err := sqlpath.Glob(paths)
-			if err != nil {
-				return err
-			}
-			for _, file := range files {
-				refs[file] = struct{}{}
-			}
-		}
-	}
-
-	for file, _ := range refs {
-		if err := addPart(w, file); err != nil {
-			return err
-		}
-	}
-
-	params, err := projectMetadata()
+func readFiles(dir string, paths []string) ([]*pb.File, error) {
+	files, err := sqlpath.Glob(paths)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	params = append(params, [2]string{"project_id", conf.Project.ID})
-	for _, val := range params {
-		if err = w.WriteField(val[0], val[1]); err != nil {
-			return err
+	var out []*pb.File
+	for _, file := range files {
+		f, err := readFile(dir, file)
+		if err != nil {
+			return nil, err
 		}
+		out = append(out, f)
 	}
-	return nil
+	return out, nil
 }
 
-func addPart(w *multipart.Writer, file string) error {
-	h, err := os.Open(file)
+func readFile(dir string, path string) (*pb.File, error) {
+	rel, err := filepath.Rel(dir, path)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer h.Close()
-	part, err := w.CreateFormFile("inputs", file)
+	blob, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = io.Copy(part, h)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func writeOutputs(w *multipart.Writer, dir string, output map[string]string) error {
-	for filename, contents := range output {
-		rel, err := filepath.Rel(dir, filename)
-		if err != nil {
-			return err
-		}
-		part, err := w.CreateFormFile("outputs", rel)
-		if err != nil {
-			return err
-		}
-		if _, err := io.WriteString(part, contents); err != nil {
-			return err
-		}
-	}
-	return nil
+	return &pb.File{
+		Name:     rel,
+		Contents: blob,
+	}, nil
 }

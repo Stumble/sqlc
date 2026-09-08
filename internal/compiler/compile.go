@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -8,10 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/migrations"
 	"github.com/sqlc-dev/sqlc/internal/multierr"
 	"github.com/sqlc-dev/sqlc/internal/opts"
+	"github.com/sqlc-dev/sqlc/internal/rpc"
+	"github.com/sqlc-dev/sqlc/internal/source"
 	"github.com/sqlc-dev/sqlc/internal/sql/ast"
 	"github.com/sqlc-dev/sqlc/internal/sql/sqlerr"
 	"github.com/sqlc-dev/sqlc/internal/sql/sqlpath"
@@ -20,50 +22,44 @@ import (
 // TODO: Rename this interface Engine
 type Parser interface {
 	Parse(io.Reader) ([]ast.Statement, error)
-	CommentSyntax() metadata.CommentSyntax
+	CommentSyntax() source.CommentSyntax
 	IsReservedKeyword(string) bool
 }
 
-// end copypasta
 func (c *Compiler) parseCatalog(schemas []string) error {
 	files, err := sqlpath.Glob(schemas)
 	if err != nil {
 		return err
 	}
 	merr := multierr.New()
-	// XXX(yumin): reverse the order of files to process dependencies first.
-	orderReversedFiles := reversed(files)
-	for i, filename := range orderReversedFiles {
+	for _, filename := range files {
 		blob, err := os.ReadFile(filename)
 		if err != nil {
 			merr.Add(filename, "", 0, err)
 			continue
 		}
 		contents := migrations.RemoveRollbackStatements(string(blob))
+		contents = migrations.RemovePsqlMetaCommands(contents)
+		c.schema = append(c.schema, contents)
+
+		// In database-only mode, we parse the schema to validate syntax
+		// but don't update the catalog - the database will be the source of truth
 		stmts, err := c.parser.Parse(strings.NewReader(contents))
 		if err != nil {
 			merr.Add(filename, contents, 0, err)
 			continue
 		}
-		tableDefined := false
-		for _, stmt := range stmts {
-			// XXX(yumin): generate table only when it's the originally the first table
-			// creation of the first file in the first schema array.
-			if err := c.catalog.Update(
-				stmt, c, !tableDefined && i == len(orderReversedFiles)-1); err != nil {
-				merr.Add(filename, contents, stmt.Pos(), err)
+
+		// Skip catalog updates in database-only mode
+		if c.databaseOnlyMode {
+			continue
+		}
+
+		for i := range stmts {
+			if err := c.catalog.Update(stmts[i], c); err != nil {
+				merr.Add(filename, contents, stmts[i].Pos(), err)
 				continue
 			}
-			definingTable := c.catalog.IsCreatingNewTableLayout(stmt)
-			if tableDefined && definingTable {
-				merr.Add(filename, contents, stmt.Pos(),
-					fmt.Errorf("only one table creation is allowed per schema.sql file"))
-			}
-			tableDefined = tableDefined || definingTable
-		}
-		// XXX(yumin): only the first schema file in the original order is added.
-		if i == len(orderReversedFiles)-1 {
-			c.catalog.AddRawSQL(contents)
 		}
 	}
 	if len(merr.Errs()) > 0 {
@@ -73,6 +69,15 @@ func (c *Compiler) parseCatalog(schemas []string) error {
 }
 
 func (c *Compiler) parseQueries(o opts.Parser) (*Result, error) {
+	ctx := context.Background()
+
+	// In database-only mode, initialize the database connection before parsing queries
+	if c.databaseOnlyMode && c.analyzer != nil {
+		if err := c.analyzer.EnsureConn(ctx, c.schema); err != nil {
+			return nil, fmt.Errorf("failed to initialize database connection: %w", err)
+		}
+	}
+
 	var q []*Query
 	merr := multierr.New()
 	set := map[string]struct{}{}
@@ -94,9 +99,6 @@ func (c *Compiler) parseQueries(o opts.Parser) (*Result, error) {
 		}
 		for _, stmt := range stmts {
 			query, err := c.parseQuery(stmt.Raw, src, o)
-			if err == ErrUnsupportedStatementType {
-				continue
-			}
 			if err != nil {
 				var e *sqlerr.Error
 				loc := stmt.Raw.Pos()
@@ -104,19 +106,25 @@ func (c *Compiler) parseQueries(o opts.Parser) (*Result, error) {
 					loc = e.Location
 				}
 				merr.Add(filename, src, loc, err)
+				// If this rpc unauthenticated error bubbles up, then all future parsing/analysis will fail
+				if errors.Is(err, rpc.ErrUnauthenticated) {
+					return nil, merr
+				}
 				continue
 			}
-			if query.Name != "" {
-				if _, exists := set[query.Name]; exists {
-					merr.Add(filename, src, stmt.Raw.Pos(), fmt.Errorf("duplicate query name: %s", query.Name))
+			if query == nil {
+				continue
+			}
+			query.Metadata.Filename = filepath.Base(filename)
+			queryName := query.Metadata.Name
+			if queryName != "" {
+				if _, exists := set[queryName]; exists {
+					merr.Add(filename, src, stmt.Raw.Pos(), fmt.Errorf("duplicate query name: %s", queryName))
 					continue
 				}
-				set[query.Name] = struct{}{}
+				set[queryName] = struct{}{}
 			}
-			query.Filename = filepath.Base(filename)
-			if query != nil {
-				q = append(q, query)
-			}
+			q = append(q, query)
 		}
 	}
 	if len(merr.Errs()) > 0 {
@@ -125,16 +133,9 @@ func (c *Compiler) parseQueries(o opts.Parser) (*Result, error) {
 	if len(q) == 0 {
 		return nil, fmt.Errorf("no queries contained in paths %s", strings.Join(c.conf.Queries, ","))
 	}
+
 	return &Result{
 		Catalog: c.catalog,
 		Queries: q,
 	}, nil
-}
-
-func reversed[V any](arr []V) []V {
-	rv := make([]V, len(arr))
-	for i := range arr {
-		rv[len(arr)-1-i] = arr[i]
-	}
-	return rv
 }

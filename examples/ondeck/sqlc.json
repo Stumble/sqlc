@@ -1,5 +1,8 @@
 {
   "version": "1",
+  "cloud": {
+    "project": "01HAQMMECEYQYKFJN8MP16QC41"
+  },
   "packages": [
     {
       "path": "postgresql",
@@ -7,8 +10,12 @@
       "schema": "postgresql/schema",
       "queries": "postgresql/query",
       "engine": "postgresql",
+      "sql_package": "database/sql",
       "database": {
-        "uri": "postgresql://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/ondeck"
+        "uri": "${VET_TEST_EXAMPLES_POSTGRES_ONDECK}"
+      },
+      "analyzer": {
+        "database": false
       },
       "rules": [
         "sqlc/db-prepare"
@@ -18,13 +25,13 @@
       "emit_interface": true
     },
     {
-      "path": "mysql",
+    "path": "mysql",
       "name": "ondeck",
       "schema": "mysql/schema",
       "queries": "mysql/query",
       "engine": "mysql",
       "database": {
-        "uri": "root:${MYSQL_ROOT_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/ondeck?multiStatements=true&parseTime=true"
+        "uri": "${VET_TEST_EXAMPLES_MYSQL_ONDECK}"
       },
       "rules": [
         "sqlc/db-prepare"
