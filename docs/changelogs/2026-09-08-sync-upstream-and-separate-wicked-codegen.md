@@ -318,7 +318,8 @@ Go 配置走标准 PluginOptions / GlobalOptions。backend 局部适配 legacy w
 
 ### 4.7 Build, test environment, and delivery
 
-- Go 工具链按上游 go.mod/CI 使用 1.26.2；当前主机默认 1.25.7、GOTOOLCHAIN=auto。
+- 初始工具链按上游使用 1.26.2；CI 后续安全核查要求升级到同系列修复版本 1.26.8，
+  go.mod 的最低版本、工具链和 CI 安全检查保持一致。主机 GOTOOLCHAIN=auto。
   保留默认 CGO 构建，另验证上游提供的非 CGO 路径。旧 v2.3.4 基线可使用当前已成功的构建方式。
 - `make proto` 保留 Buf 生成路径；增加 BUF 参数，允许使用固定版本
   `go run github.com/bufbuild/buf/cmd/buf@v1.72.0`。当前没有 buf/protoc，不能手改生成绑定代替生成。
@@ -523,8 +524,27 @@ Bookstore 的 `make test`、Go 1.25.7 与 Go 1.26.2 的 race suite、`make lint-
 
 ## 8. Remaining Work
 
-- 发布自己的 fork 与 bookstore 配套 PR 并监控 CI；不自动合并或发布 release。
+- 已发布 [sqlc #16](https://github.com/Stumble/sqlc/pull/16) 与
+  [bookstore #2](https://github.com/Stumble/bookstore/pull/2)。CI 的最终状态以对应 PR 为准；不自动合并或发布 release。
 - 在自己的整套验证通过的基础上，独立整理通用类型推导补丁的上游 PR。
 - 已保留的限制：顶层 SELECT 分类不等于完整只读证明；ordinary view 不能作为 wicked 主模型；
   wicked batch/execlastid 和 database-only 分析不支持；copyfrom 不实现 cache/invalidate 选项。
 - 样例 replica 用例验证 API/连接选择，不模拟物理复制延迟；wpgx/dcache 运行时版本未升级。
+
+### CI security follow-up
+
+首次发布后，GitHub 上的六个平台构建、完整 Go 测试、Buf 和 bookstore 验证均通过。
+安全检查发现 v1.31.1 上游依赖中的 GO-2026-6061（grpc）和 GO-2026-5970（x/text）。
+本地按实际构建工具链扫描还发现 Go 1.26.2 标准库及 x/net 的修复需求。
+修复范围限定为 grpc v1.82.1、x/text v0.39.0、x/net v0.55.0 及其必要传递依赖，
+并将工具链升级为 Go 1.26.8，安全检查也固定到该构建版本。
+这不改变编译器的 v1.31.1 代码基线或下游 wpgx/dcache 版本；修改后重新进行完整验证。
+
+安全修复后的再次验证全部通过：Go 1.26.8 下的 focused tests、完整 examples/endtoend 套件
+（internal/endtoend 约 152 秒）、CGO/非 CGO 构建、生成 diff 和 bookstore race suite。
+`go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...` 报告 0 个可达漏洞；
+工具另提示一个未被调用到的导入包/模块公告，不属于可达代码路径的失败项。
+
+参考：[Go security advisories](https://pkg.go.dev/vuln/GO-2026-6061)、
+[x/text advisory](https://pkg.go.dev/vuln/GO-2026-5970)、
+[Go release history](https://go.dev/doc/devel/release#go1.26.8)。

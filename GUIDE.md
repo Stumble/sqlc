@@ -62,7 +62,7 @@ sqlc version
 
 ### Upstream synchronization development
 
-The migration branch integrates upstream **v1.31.1**. It uses Go 1.26.2 (the Go
+The migration branch integrates upstream **v1.31.1**. It uses Go 1.26.8 (the Go
 toolchain can select this automatically) and keeps the same `make install`,
 `sqlc generate`, `sqlc diff`, and `sql_package: wpgx` entrypoints. It is a single
 executable; no additional codegen plugin needs to be installed.
