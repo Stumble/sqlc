@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: [primary.sql, books.sql]
+    queries: query.sql
+    gen:
+      go:
+        package: revenues
+        sql_package: wpgx
+        emit_interface: true
+        out: go
