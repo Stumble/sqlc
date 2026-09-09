@@ -16,11 +16,13 @@ NOTE: this combo is for PostgreSQL, if you are using MySQL, you can checkout thi
 [Needle](https://github.com/Stumble/needle). It provides the same set of functionalities
 as this combo.
 
-Production versions:
+wicked-sqlc has its own [release tags](https://github.com/Stumble/sqlc/releases),
+independent of upstream sqlc's version numbers. We regularly rebase our changes
+onto upstream releases.
 
-+ sqlc: v2.3.4-wicked-fork
-+ dcache: v0.3.0 (Note: redis/v8 users please use v0.1.4)
-+ wgpx: v0.3.1
+The generator update does not require upgrading your application's wpgx or
+dcache dependencies. See the [bookstore go.mod](https://github.com/Stumble/bookstore/blob/main/go.mod)
+for a tested runtime dependency set.
 
 # Sqlc (this wicked fork)
 
@@ -50,31 +52,33 @@ your customers are disappointed, or (2) before the product is launched, writing 
 
 ## Install
 
+Build this fork from source using the Go version required by [go.mod](go.mod).
+The default build uses CGO and requires a C compiler. Ensure Go's installation
+directory (`GOBIN`, or `GOPATH/bin` when unset) is on your `PATH`.
+
 ```bash
-# cgo must be enabled because: https://github.com/pganalyze/pg_query_go
 git clone https://github.com/Stumble/sqlc.git
-cd sqlc/
-git checkout v2.3.4
+cd sqlc
 make install
 sqlc version
-# you shall see: v2.3.4-wicked-fork
 ```
 
-### Upstream synchronization development
+This installs the current `main` branch. For a reproducible build, check out a
+published tag from [Releases](https://github.com/Stumble/sqlc/releases) before
+running `make install`. A build from tag `vX.Y.Z` reports `vX.Y.Z-wicked-fork`;
+untagged builds include a Git-derived version identifier.
 
-The migration branch applies two commits directly on upstream **v1.31.1**:
-core compiler/protocol changes, followed by the wicked backend and its integration.
-It uses Go 1.26.8 (the Go
-toolchain can select this automatically) and keeps the same `make install`,
-`sqlc generate`, `sqlc diff`, and `sql_package: wpgx` entrypoints. It is a single
-executable; no additional codegen plugin needs to be installed.
+CGO is optional. To install without a C compiler:
 
 ```bash
-git checkout refactor/wicked-on-upstream
-make install
-# The upstream parser also supports builds without CGO:
-make build CGO_ENABLED=0
+make install CGO_ENABLED=0
 ```
+
+Use `make build` to create `bin/sqlc` without installing it. `sqlc generate`,
+`sqlc diff`, and `sql_package: wpgx` remain the entrypoints for existing projects.
+There is one executable and no separate codegen plugin to install.
+
+### Architecture and development
 
 The compiler handles schema dependencies, the primary model, and SQL types.
 `internal/codegen/wicked` owns the Go mapping, templates, comment options, cache
@@ -82,10 +86,11 @@ keys, timeouts, invalidation, and replica APIs. Standard Go generation remains
 in the upstream backend. Wicked facts are transported in `WickedMetadata`;
 `-- -- key: value` options use the standard query comments.
 
-For reproducible migration fixtures, CI builds with
+For reproducible compatibility fixtures, CI builds with
 `make build COMMIT_HASH=v2.4.0-dev`. This development label is not a published
-release. General compiler fixes are committed in this fork first and are only
-proposed upstream after the complete fork and downstream tests pass.
+release and does not identify the version installed from a release tag. General
+compiler fixes are committed in this fork first and are only proposed upstream
+after the complete fork and downstream tests pass.
 
 Compatibility is checked against v2.3.4, including the full `github.com/google/uuid`
 type identity, inherited primary models, generated Row types, and JSON/cache
@@ -379,9 +384,9 @@ LIMIT @first;
 
 This wicked forked sqlc adds 3 abilities to query: cache, timeout and invalidate.
 
-All of them are added by extending sqlc to allow passing additional options per each query.
-Originally, you can only specify name and the type of result in the comments before SQL.
-The new feature allows you to pass any options to codegen backend by adding comments starts with `-- --`.
+Options are written as `-- -- key: value` comments above each query. sqlc passes
+them through its standard query comments, and the wicked backend parses and
+validates them. They do not require a separate custom-parameter protocol.
 
 For example, this will generate code that caches the result of all books for 10 minutes, with 500 milliseconds timeout.
 
