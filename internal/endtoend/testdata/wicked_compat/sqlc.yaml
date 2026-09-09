@@ -1,0 +1,15 @@
+version: '2'
+sql:
+  - schema: [schema.sql, parents.sql]
+    queries: query.sql
+    engine: postgresql
+    gen:
+      go:
+        package: compat
+        out: go
+        sql_package: wpgx
+        overrides:
+          - db_type: pg_catalog.int8
+            go_struct_tag: 'json:"changed_id"'
+          - column: records.name
+            go_struct_tag: 'json:"display_name"'

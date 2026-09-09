@@ -1,0 +1,33 @@
+name: wicked
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  bookstore:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: make build COMMIT_HASH=v2.4.0-dev
+      - name: Check generated consumer and JSON contracts
+        working-directory: internal/endtoend/testdata
+        run: go test ./wicked_compat/go
+      - uses: actions/checkout@v6
+        with:
+          repository: Stumble/bookstore
+          ref: 2a7f7e396451821a8fe3054eb265037b830af68d
+          path: bookstore
+      - name: Check generated API and code
+        working-directory: bookstore
+        run: |
+          make sqlc SQLC="$GITHUB_WORKSPACE/bin/sqlc"
+          make sqlc-verify SQLC="$GITHUB_WORKSPACE/bin/sqlc"
+          git diff --exit-code -- pkg/repos
+      - name: Run runtime contracts
+        working-directory: bookstore
+        run: go test -race -count=1 -p 1 -timeout 10m ./pkg/usecases

@@ -1,0 +1,12 @@
+{{define "interfaceCodeWPgx"}}
+type Querier interface {
+{{range .GoQueries}}
+{{if eq .Cmd ":copyfrom"}}
+    {{.MethodName}}(ctx context.Context, {{.Arg.SlicePair}}) (int64, error)
+{{else}}
+    {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) {{if eq .Cmd ":one"}}(*{{.Ret.Type}}, error){{else if eq .Cmd ":many"}}([]{{.Ret.Type}}, error){{else if eq .Cmd ":exec"}}error{{else if eq .Cmd ":execrows"}}(int64, error){{else if eq .Cmd ":execresult"}}(pgconn.CommandTag, error){{end}}
+{{end}}
+{{end}}
+}
+var _ Querier = (*Queries)(nil)
+{{end}}

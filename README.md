@@ -1,5 +1,10 @@
 # sqlc: A SQL Compiler
 
+This is the **wicked fork** of sqlc, with a dedicated Go backend for wpgx and
+dcache. See [GUIDE.md](GUIDE.md) for its schema conventions, timeout/cache options,
+installation, and migration testing. The current migration is two commits on
+upstream v1.31.1: core changes, then the wicked backend, preserving the v2.3.4 API.
+
 ![go](https://github.com/sqlc-dev/sqlc/workflows/go/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sqlc-dev/sqlc)](https://goreportcard.com/report/github.com/sqlc-dev/sqlc)
 
