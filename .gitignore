@@ -8,4 +8,5 @@ __pycache__
 .direnv
 .devenv*
 devenv.local.nix
-
+# Local command builds.
+/bin/

@@ -50,6 +50,11 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 		return nil
 	}
 
+	// The same unaliased relation can occur in multiple query scopes (for
+	// example a CTE followed by INSERT into that table). Index it once rather
+	// than reporting its column twice as an ambiguous parameter context.
+	// Distinct aliases remain distinct inputs, including in self-joins.
+	unaliased := make(map[ast.TableName]bool)
 	for _, rv := range rvs {
 		if rv.Relname == nil {
 			continue
@@ -71,6 +76,16 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 				return nil, err
 			}
 			continue
+		}
+		if rv.Alias == nil {
+			identity := *table.Rel
+			if identity.Schema == "" {
+				identity.Schema = c.DefaultSchema
+			}
+			if unaliased[identity] {
+				continue
+			}
+			unaliased[identity] = true
 		}
 		err = indexTable(table)
 		if err != nil {

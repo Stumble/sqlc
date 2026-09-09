@@ -28,6 +28,7 @@ type Compiler struct {
 	selector selector
 
 	schema []string
+	wicked *WickedSchema
 
 	// databaseOnlyMode indicates that the compiler should use database-only analysis
 	// and skip building the internal catalog from schema files (analyzer.database: only)

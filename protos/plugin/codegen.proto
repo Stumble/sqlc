@@ -44,6 +44,8 @@ message Codegen {
 }
 
 message Catalog {
+  reserved 5;
+  reserved "raw_sqls";
   string comment = 1;
   string default_schema = 2;
   string name = 3;
@@ -70,6 +72,8 @@ message Enum {
 }
 
 message Table {
+  reserved 4;
+  reserved "generate_model";
   Identifier rel = 1;
   repeated Column columns = 2;
   string comment = 3;
@@ -103,6 +107,8 @@ message Column {
 }
 
 message Query {
+  reserved 9;
+  reserved "options";
   string text = 1 [json_name = "text"];
   string name = 2 [json_name = "name"];
   string cmd = 3 [json_name = "cmd"];
@@ -125,6 +131,20 @@ message GenerateRequest {
   string sqlc_version = 4 [json_name = "sqlc_version"];
   bytes plugin_options = 5 [json_name = "plugin_options"];
   bytes global_options = 6 [json_name = "global_options"];
+  // Fork metadata is absent for standard generators, including in JSON output.
+  oneof backend_metadata {
+    WickedMetadata wicked = 1000;
+  }
+}
+
+// Facts collected by the compiler for wicked generation. Query options remain
+// in Query.comments and are interpreted by the backend.
+message WickedMetadata {
+  string primary_schema_path = 1;
+  string primary_schema_sql = 2;
+  Identifier primary_relation = 3;
+  // This means a top-level SELECT, not a proof that a query is read-only.
+  map<string, bool> query_is_select = 4;
 }
 
 message GenerateResponse {
