@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/sqlc-dev/sqlc/internal/config"
@@ -47,6 +48,9 @@ func TestValidSchema(t *testing.T) {
 				var schema []string
 				for _, path := range pkg.Schema {
 					schema = append(schema, filepath.Join(filepath.Dir(file), path))
+				}
+				if pkg.IsWicked() {
+					slices.Reverse(schema)
 				}
 
 				switch pkg.Engine {
