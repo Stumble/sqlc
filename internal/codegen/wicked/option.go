@@ -11,6 +11,7 @@ const (
 	WPgxOptionKeyInvalidate   = "invalidate"
 	WpgxOptionKeyCountIntent  = "count_intent"
 	WpgxOptionKeyTimeout      = "timeout"
+	WpgxOptionKeySQLTimeout   = "sql_timeout"
 	WpgxOptionKeyAllowReplica = "allow_replica"
 )
 
@@ -19,6 +20,7 @@ type WPgxOption struct {
 	Invalidates  []string
 	CountIntent  bool
 	Timeout      time.Duration
+	SQLTimeout   time.Duration
 	AllowReplica bool
 }
 
@@ -67,8 +69,24 @@ func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgx
 			} else {
 				return rv, fmt.Errorf("Unknown allow_replica value: %s", v)
 			}
+		case WpgxOptionKeySQLTimeout:
+			rv.SQLTimeout, err = time.ParseDuration(v)
+			if err != nil {
+				return
+			}
+			if rv.SQLTimeout < time.Millisecond {
+				return rv, fmt.Errorf("sql_timeout duration too short: %s", v)
+			}
 		default:
 			return rv, fmt.Errorf("Unknown option: %s", k)
+		}
+	}
+	if rv.SQLTimeout > 0 {
+		if rv.Cache == 0 || rv.Timeout == 0 {
+			return rv, fmt.Errorf("sql_timeout requires cache and timeout options")
+		}
+		if rv.SQLTimeout > rv.Timeout {
+			return rv, fmt.Errorf("sql_timeout cannot exceed timeout")
 		}
 	}
 	return

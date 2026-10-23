@@ -85,6 +85,7 @@ SELECT id, external_id, optional_uuid, name, data FROM records WHERE id = $1
 
 // -- timeout: 1s
 // -- cache: 1m
+// -- sql_timeout: 250ms
 func (q *Queries) GetRecord(ctx context.Context, id int64) (*Record, error) {
 	return _GetRecord(ctx, q.AsReadOnly(), id)
 }
@@ -98,6 +99,8 @@ func _GetRecord(ctx context.Context, q CacheQuerierConn, id int64) (*Record, err
 	defer cancel()
 	q.GetConn().CountIntent("compat.GetRecord")
 	dbRead := func() (any, time.Duration, error) {
+		qctx, cancel := context.WithTimeout(qctx, time.Millisecond*250)
+		defer cancel()
 		cacheDuration := time.Duration(time.Millisecond * 60000)
 		row := q.GetConn().WQueryRow(qctx, "compat.GetRecord", getRecord, id)
 		var i *Record = new(Record)
@@ -125,6 +128,66 @@ func _GetRecord(ctx context.Context, q CacheQuerierConn, id int64) (*Record, err
 	}
 
 	return i, err
+}
+
+const listRecords = `-- name: ListRecords :many
+SELECT id, external_id, optional_uuid, name, data FROM records ORDER BY id
+`
+
+// -- timeout: 1s
+// -- cache: 1m
+// -- sql_timeout: 250ms
+func (q *Queries) ListRecords(ctx context.Context) ([]Record, error) {
+	return _ListRecords(ctx, q.AsReadOnly())
+}
+
+func (q *ReadOnlyQueries) ListRecords(ctx context.Context) ([]Record, error) {
+	return _ListRecords(ctx, q)
+}
+
+func _ListRecords(ctx context.Context, q CacheQuerierConn) ([]Record, error) {
+	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
+	defer cancel()
+	q.GetConn().CountIntent("compat.ListRecords")
+	dbRead := func() (any, time.Duration, error) {
+		qctx, cancel := context.WithTimeout(qctx, time.Millisecond*250)
+		defer cancel()
+		cacheDuration := time.Duration(time.Millisecond * 60000)
+		rows, err := q.GetConn().WQuery(qctx, "compat.ListRecords", listRecords)
+		if err != nil {
+			return []Record(nil), 0, err
+		}
+		defer rows.Close()
+		var items []Record
+		for rows.Next() {
+			var i *Record = new(Record)
+			if err := rows.Scan(
+				&i.ID,
+				&i.ExternalID,
+				&i.OptionalUuid,
+				&i.Name,
+				&i.Data,
+			); err != nil {
+				return []Record(nil), 0, err
+			}
+			items = append(items, *i)
+		}
+		if err := rows.Err(); err != nil {
+			return []Record(nil), 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.GetCache() == nil {
+		items, _, err := dbRead()
+		return items.([]Record), err
+	}
+	var items []Record
+	err := q.GetCache().GetWithTtl(qctx, "compat:ListRecords:", &items, dbRead, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return items, err
 }
 
 //// auto generated functions

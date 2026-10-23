@@ -91,6 +91,28 @@ func TestQueryOptions(t *testing.T) {
 	}
 }
 
+func TestSQLTimeoutOption(t *testing.T) {
+	opts, err := parseQueryOptions([]string{" -- timeout: 1s", " -- cache: 1m", " -- sql_timeout: 250ms"}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Timeout != time.Second || opts.SQLTimeout != 250*time.Millisecond {
+		t.Fatalf("budgets = %+v", opts)
+	}
+	for _, comments := range [][]string{
+		{" -- timeout: 1s", " -- cache: 1m", " -- sql_timeout: invalid"},
+		{" -- timeout: 1s", " -- cache: 1m", " -- sql_timeout: 0"},
+		{" -- timeout: 1s", " -- cache: 1m", " -- sql_timeout: 1us"},
+		{" -- timeout: 1s", " -- sql_timeout: 250ms"},
+		{" -- cache: 1m", " -- sql_timeout: 250ms"},
+		{" -- timeout: 1s", " -- cache: 1m", " -- sql_timeout: 2s"},
+	} {
+		if _, err := parseQueryOptions(comments, true, nil); err == nil {
+			t.Errorf("accepted invalid SQL budget: %v", comments)
+		}
+	}
+}
+
 func TestInvalidQueryOptions(t *testing.T) {
 	for _, tc := range []struct {
 		comment    string

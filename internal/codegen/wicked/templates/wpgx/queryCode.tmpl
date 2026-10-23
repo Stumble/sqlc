@@ -65,6 +65,10 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
     }
 {{else}}
     dbRead := func() (any, time.Duration, error) {
+        {{- if gt .Option.SQLTimeout.Milliseconds 0 }}
+        qctx, cancel := context.WithTimeout(qctx, time.Millisecond * {{.Option.SQLTimeout.Milliseconds}})
+        defer cancel()
+        {{- end }}
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
         row := q.GetConn().WQueryRow(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
         var {{.Ret.Name}} *{{.Ret.Type}} = new({{.Ret.Type}})
@@ -163,6 +167,10 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
     }
 {{else}}
     dbRead := func() (any, time.Duration, error) {
+        {{- if gt .Option.SQLTimeout.Milliseconds 0 }}
+        qctx, cancel := context.WithTimeout(qctx, time.Millisecond * {{.Option.SQLTimeout.Milliseconds}})
+        defer cancel()
+        {{- end }}
         cacheDuration := time.Duration(time.Millisecond * {{.Option.Cache.Milliseconds}})
         rows, err := q.GetConn().WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
         if err != nil {

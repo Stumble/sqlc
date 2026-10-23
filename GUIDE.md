@@ -382,7 +382,25 @@ ORDER BY
 LIMIT @first;
 ```
 
-This wicked forked sqlc adds 3 abilities to query: cache, timeout and invalidate.
+`timeout` bounds the overall operation, including cache lookup. Cached `:one`
+and `:many` queries can additionally set `sql_timeout` to start a separate SQL
+budget inside the database callback:
+
+```sql
+-- name: GetBook :one
+-- -- timeout: 1s
+-- -- cache: 10m
+-- -- sql_timeout: 250ms
+SELECT * FROM books WHERE id = @id;
+```
+
+A 350ms cache miss leaves up to 250ms for SQL, rather than consuming its entire
+budget. SQL still obeys any earlier operation or caller deadline. Without
+`sql_timeout`, generated timeout behavior is unchanged. The option requires
+`cache` and `timeout`, and cannot exceed the overall timeout. A nil cache still
+uses the SQL budget. Redis transport deadlines remain the client's responsibility.
+
+This wicked forked sqlc adds caching, timeouts and invalidation to queries.
 
 Options are written as `-- -- key: value` comments above each query. sqlc passes
 them through its standard query comments, and the wicked backend parses and
