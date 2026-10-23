@@ -1697,6 +1697,7 @@ func (p *SQLiteParser) Parse() (localctx IParseContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -1707,7 +1708,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISql_stmt_listContext is an interface to support dynamic dispatch.
@@ -1947,6 +1947,7 @@ func (p *SQLiteParser) Sql_stmt_list() (localctx ISql_stmt_listContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -1957,7 +1958,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISql_stmtContext is an interface to support dynamic dispatch.
@@ -2653,6 +2653,7 @@ func (p *SQLiteParser) Sql_stmt() (localctx ISql_stmtContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -2663,7 +2664,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAlter_table_stmtContext is an interface to support dynamic dispatch.
@@ -3094,6 +3094,7 @@ func (p *SQLiteParser) Alter_table_stmt() (localctx IAlter_table_stmtContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -3104,7 +3105,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAnalyze_stmtContext is an interface to support dynamic dispatch.
@@ -3269,6 +3269,7 @@ func (p *SQLiteParser) Analyze_stmt() (localctx IAnalyze_stmtContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -3279,7 +3280,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAttach_stmtContext is an interface to support dynamic dispatch.
@@ -3441,6 +3441,7 @@ func (p *SQLiteParser) Attach_stmt() (localctx IAttach_stmtContext) {
 		p.Schema_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -3451,7 +3452,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBegin_stmtContext is an interface to support dynamic dispatch.
@@ -3627,6 +3627,7 @@ func (p *SQLiteParser) Begin_stmt() (localctx IBegin_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -3637,7 +3638,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICommit_stmtContext is an interface to support dynamic dispatch.
@@ -3756,6 +3756,7 @@ func (p *SQLiteParser) Commit_stmt() (localctx ICommit_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -3766,7 +3767,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IRollback_stmtContext is an interface to support dynamic dispatch.
@@ -3942,6 +3942,7 @@ func (p *SQLiteParser) Rollback_stmt() (localctx IRollback_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -3952,7 +3953,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISavepoint_stmtContext is an interface to support dynamic dispatch.
@@ -4059,6 +4059,7 @@ func (p *SQLiteParser) Savepoint_stmt() (localctx ISavepoint_stmtContext) {
 		p.Savepoint_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -4069,7 +4070,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IRelease_stmtContext is an interface to support dynamic dispatch.
@@ -4197,6 +4197,7 @@ func (p *SQLiteParser) Release_stmt() (localctx IRelease_stmtContext) {
 		p.Savepoint_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -4207,7 +4208,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICreate_index_stmtContext is an interface to support dynamic dispatch.
@@ -4630,6 +4630,7 @@ func (p *SQLiteParser) Create_index_stmt() (localctx ICreate_index_stmtContext) 
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -4640,7 +4641,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIndexed_columnContext is an interface to support dynamic dispatch.
@@ -4846,6 +4846,7 @@ func (p *SQLiteParser) Indexed_column() (localctx IIndexed_columnContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -4856,7 +4857,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_optionContext is an interface to support dynamic dispatch.
@@ -4998,6 +4998,7 @@ func (p *SQLiteParser) Table_option() (localctx ITable_optionContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -5008,7 +5009,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICreate_table_stmtContext is an interface to support dynamic dispatch.
@@ -5575,6 +5575,7 @@ func (p *SQLiteParser) Create_table_stmt() (localctx ICreate_table_stmtContext) 
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -5585,7 +5586,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IColumn_defContext is an interface to support dynamic dispatch.
@@ -5773,6 +5773,7 @@ func (p *SQLiteParser) Column_def() (localctx IColumn_defContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -5783,7 +5784,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IType_nameContext is an interface to support dynamic dispatch.
@@ -6049,6 +6049,7 @@ func (p *SQLiteParser) Type_name() (localctx IType_nameContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -6059,7 +6060,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IColumn_constraintContext is an interface to support dynamic dispatch.
@@ -6688,6 +6688,7 @@ func (p *SQLiteParser) Column_constraint() (localctx IColumn_constraintContext) 
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -6698,7 +6699,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISigned_numberContext is an interface to support dynamic dispatch.
@@ -6817,6 +6817,7 @@ func (p *SQLiteParser) Signed_number() (localctx ISigned_numberContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -6827,7 +6828,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_constraintContext is an interface to support dynamic dispatch.
@@ -7342,6 +7342,7 @@ func (p *SQLiteParser) Table_constraint() (localctx ITable_constraintContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -7352,7 +7353,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForeign_key_clauseContext is an interface to support dynamic dispatch.
@@ -7955,6 +7955,7 @@ func (p *SQLiteParser) Foreign_key_clause() (localctx IForeign_key_clauseContext
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -7965,7 +7966,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IConflict_clauseContext is an interface to support dynamic dispatch.
@@ -8102,6 +8102,7 @@ func (p *SQLiteParser) Conflict_clause() (localctx IConflict_clauseContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -8112,7 +8113,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICreate_trigger_stmtContext is an interface to support dynamic dispatch.
@@ -8979,6 +8979,7 @@ func (p *SQLiteParser) Create_trigger_stmt() (localctx ICreate_trigger_stmtConte
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -8989,7 +8990,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICreate_view_stmtContext is an interface to support dynamic dispatch.
@@ -9386,6 +9386,7 @@ func (p *SQLiteParser) Create_view_stmt() (localctx ICreate_view_stmtContext) {
 		p.Select_stmt()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -9396,7 +9397,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICreate_virtual_table_stmtContext is an interface to support dynamic dispatch.
@@ -9775,6 +9775,7 @@ func (p *SQLiteParser) Create_virtual_table_stmt() (localctx ICreate_virtual_tab
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -9785,7 +9786,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWith_clauseContext is an interface to support dynamic dispatch.
@@ -10108,6 +10108,7 @@ func (p *SQLiteParser) With_clause() (localctx IWith_clauseContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -10118,7 +10119,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICte_table_nameContext is an interface to support dynamic dispatch.
@@ -10335,6 +10335,7 @@ func (p *SQLiteParser) Cte_table_name() (localctx ICte_table_nameContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -10345,7 +10346,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IRecursive_cteContext is an interface to support dynamic dispatch.
@@ -10558,6 +10558,7 @@ func (p *SQLiteParser) Recursive_cte() (localctx IRecursive_cteContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -10568,7 +10569,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICommon_table_expressionContext is an interface to support dynamic dispatch.
@@ -10845,6 +10845,7 @@ func (p *SQLiteParser) Common_table_expression() (localctx ICommon_table_express
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -10855,7 +10856,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IReturning_clauseContext is an interface to support dynamic dispatch.
@@ -11202,6 +11202,7 @@ func (p *SQLiteParser) Returning_clause() (localctx IReturning_clauseContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -11212,7 +11213,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDelete_stmtContext is an interface to support dynamic dispatch.
@@ -11440,6 +11440,7 @@ func (p *SQLiteParser) Delete_stmt() (localctx IDelete_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -11450,7 +11451,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDelete_stmt_limitedContext is an interface to support dynamic dispatch.
@@ -11740,6 +11740,7 @@ func (p *SQLiteParser) Delete_stmt_limited() (localctx IDelete_stmt_limitedConte
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -11750,7 +11751,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDetach_stmtContext is an interface to support dynamic dispatch.
@@ -11878,6 +11878,7 @@ func (p *SQLiteParser) Detach_stmt() (localctx IDetach_stmtContext) {
 		p.Schema_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -11888,7 +11889,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDrop_stmtContext is an interface to support dynamic dispatch.
@@ -12122,6 +12122,7 @@ func (p *SQLiteParser) Drop_stmt() (localctx IDrop_stmtContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -12132,7 +12133,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExprContext is an interface to support dynamic dispatch.
@@ -14901,6 +14901,7 @@ func (p *SQLiteParser) expr(_p int) (localctx IExprContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -14911,7 +14912,6 @@ errorExit:
 	}
 	p.UnrollRecursionContexts(_parentctx)
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IRaise_functionContext is an interface to support dynamic dispatch.
@@ -15113,6 +15113,7 @@ func (p *SQLiteParser) Raise_function() (localctx IRaise_functionContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -15123,7 +15124,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILiteral_valueContext is an interface to support dynamic dispatch.
@@ -15254,6 +15254,7 @@ func (p *SQLiteParser) Literal_value() (localctx ILiteral_valueContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -15264,7 +15265,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInsert_stmtContext is an interface to support dynamic dispatch.
@@ -16012,6 +16012,7 @@ func (p *SQLiteParser) Insert_stmt() (localctx IInsert_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -16022,7 +16023,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUpsert_clauseContext is an interface to support dynamic dispatch.
@@ -16597,6 +16597,7 @@ func (p *SQLiteParser) Upsert_clause() (localctx IUpsert_clauseContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -16607,7 +16608,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPragma_stmtContext is an interface to support dynamic dispatch.
@@ -16834,6 +16834,7 @@ func (p *SQLiteParser) Pragma_stmt() (localctx IPragma_stmtContext) {
 	default:
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -16844,7 +16845,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPragma_valueContext is an interface to support dynamic dispatch.
@@ -16990,6 +16990,7 @@ func (p *SQLiteParser) Pragma_value() (localctx IPragma_valueContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -17000,7 +17001,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IReindex_stmtContext is an interface to support dynamic dispatch.
@@ -17217,6 +17217,7 @@ func (p *SQLiteParser) Reindex_stmt() (localctx IReindex_stmtContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -17227,7 +17228,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISelect_stmtContext is an interface to support dynamic dispatch.
@@ -17518,6 +17518,7 @@ func (p *SQLiteParser) Select_stmt() (localctx ISelect_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -17528,7 +17529,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJoin_clauseContext is an interface to support dynamic dispatch.
@@ -17764,6 +17764,7 @@ func (p *SQLiteParser) Join_clause() (localctx IJoin_clauseContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -17774,7 +17775,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISelect_coreContext is an interface to support dynamic dispatch.
@@ -18618,6 +18618,7 @@ func (p *SQLiteParser) Select_core() (localctx ISelect_coreContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -18628,7 +18629,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFactored_select_stmtContext is an interface to support dynamic dispatch.
@@ -18722,6 +18722,7 @@ func (p *SQLiteParser) Factored_select_stmt() (localctx IFactored_select_stmtCon
 		p.Select_stmt()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -18732,7 +18733,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISimple_select_stmtContext is an interface to support dynamic dispatch.
@@ -18921,6 +18921,7 @@ func (p *SQLiteParser) Simple_select_stmt() (localctx ISimple_select_stmtContext
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -18931,7 +18932,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICompound_select_stmtContext is an interface to support dynamic dispatch.
@@ -19265,6 +19265,7 @@ func (p *SQLiteParser) Compound_select_stmt() (localctx ICompound_select_stmtCon
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -19275,7 +19276,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_or_subqueryContext is an interface to support dynamic dispatch.
@@ -20294,6 +20294,7 @@ func (p *SQLiteParser) Table_or_subquery() (localctx ITable_or_subqueryContext) 
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -20304,7 +20305,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IResult_columnContext is an interface to support dynamic dispatch.
@@ -20527,6 +20527,7 @@ func (p *SQLiteParser) Result_column() (localctx IResult_columnContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -20537,7 +20538,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJoin_operatorContext is an interface to support dynamic dispatch.
@@ -20777,6 +20777,7 @@ func (p *SQLiteParser) Join_operator() (localctx IJoin_operatorContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -20787,7 +20788,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJoin_constraintContext is an interface to support dynamic dispatch.
@@ -21032,6 +21032,7 @@ func (p *SQLiteParser) Join_constraint() (localctx IJoin_constraintContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -21042,7 +21043,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICompound_operatorContext is an interface to support dynamic dispatch.
@@ -21198,6 +21198,7 @@ func (p *SQLiteParser) Compound_operator() (localctx ICompound_operatorContext) 
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -21208,7 +21209,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUpdate_stmtContext is an interface to support dynamic dispatch.
@@ -21717,6 +21717,7 @@ func (p *SQLiteParser) Update_stmt() (localctx IUpdate_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -21727,7 +21728,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IColumn_name_listContext is an interface to support dynamic dispatch.
@@ -21913,6 +21913,7 @@ func (p *SQLiteParser) Column_name_list() (localctx IColumn_name_listContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -21923,7 +21924,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUpdate_stmt_limitedContext is an interface to support dynamic dispatch.
@@ -22463,6 +22463,7 @@ func (p *SQLiteParser) Update_stmt_limited() (localctx IUpdate_stmt_limitedConte
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -22473,7 +22474,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IQualified_table_nameContext is an interface to support dynamic dispatch.
@@ -22737,6 +22737,7 @@ func (p *SQLiteParser) Qualified_table_name() (localctx IQualified_table_nameCon
 	default:
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -22747,7 +22748,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVacuum_stmtContext is an interface to support dynamic dispatch.
@@ -22908,6 +22908,7 @@ func (p *SQLiteParser) Vacuum_stmt() (localctx IVacuum_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -22918,7 +22919,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFilter_clauseContext is an interface to support dynamic dispatch.
@@ -23064,6 +23064,7 @@ func (p *SQLiteParser) Filter_clause() (localctx IFilter_clauseContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -23074,7 +23075,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWindow_defnContext is an interface to support dynamic dispatch.
@@ -23459,6 +23459,7 @@ func (p *SQLiteParser) Window_defn() (localctx IWindow_defnContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -23469,7 +23470,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOver_clauseContext is an interface to support dynamic dispatch.
@@ -23910,6 +23910,7 @@ func (p *SQLiteParser) Over_clause() (localctx IOver_clauseContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -23920,7 +23921,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFrame_specContext is an interface to support dynamic dispatch.
@@ -24124,6 +24124,7 @@ func (p *SQLiteParser) Frame_spec() (localctx IFrame_specContext) {
 	default:
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -24134,7 +24135,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFrame_clauseContext is an interface to support dynamic dispatch.
@@ -24338,6 +24338,7 @@ func (p *SQLiteParser) Frame_clause() (localctx IFrame_clauseContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -24348,7 +24349,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISimple_function_invocationContext is an interface to support dynamic dispatch.
@@ -24583,6 +24583,7 @@ func (p *SQLiteParser) Simple_function_invocation() (localctx ISimple_function_i
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -24593,7 +24594,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAggregate_function_invocationContext is an interface to support dynamic dispatch.
@@ -24879,6 +24879,7 @@ func (p *SQLiteParser) Aggregate_function_invocation() (localctx IAggregate_func
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -24889,7 +24890,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWindow_function_invocationContext is an interface to support dynamic dispatch.
@@ -25223,6 +25223,7 @@ func (p *SQLiteParser) Window_function_invocation() (localctx IWindow_function_i
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -25233,7 +25234,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICommon_table_stmtContext is an interface to support dynamic dispatch.
@@ -25427,6 +25427,7 @@ func (p *SQLiteParser) Common_table_stmt() (localctx ICommon_table_stmtContext) 
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -25437,7 +25438,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOrder_by_stmtContext is an interface to support dynamic dispatch.
@@ -25623,6 +25623,7 @@ func (p *SQLiteParser) Order_by_stmt() (localctx IOrder_by_stmtContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -25633,7 +25634,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILimit_stmtContext is an interface to support dynamic dispatch.
@@ -25803,6 +25803,7 @@ func (p *SQLiteParser) Limit_stmt() (localctx ILimit_stmtContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -25813,7 +25814,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOrdering_termContext is an interface to support dynamic dispatch.
@@ -26028,6 +26028,7 @@ func (p *SQLiteParser) Ordering_term() (localctx IOrdering_termContext) {
 
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -26038,7 +26039,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAsc_descContext is an interface to support dynamic dispatch.
@@ -26134,6 +26134,7 @@ func (p *SQLiteParser) Asc_desc() (localctx IAsc_descContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -26144,7 +26145,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFrame_leftContext is an interface to support dynamic dispatch.
@@ -26336,6 +26336,7 @@ func (p *SQLiteParser) Frame_left() (localctx IFrame_leftContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -26346,7 +26347,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFrame_rightContext is an interface to support dynamic dispatch.
@@ -26538,6 +26538,7 @@ func (p *SQLiteParser) Frame_right() (localctx IFrame_rightContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -26548,7 +26549,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFrame_singleContext is an interface to support dynamic dispatch.
@@ -26720,6 +26720,7 @@ func (p *SQLiteParser) Frame_single() (localctx IFrame_singleContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -26730,7 +26731,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWindow_functionContext is an interface to support dynamic dispatch.
@@ -27554,6 +27554,7 @@ func (p *SQLiteParser) Window_function() (localctx IWindow_functionContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -27564,7 +27565,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOf_OF_fsetContext is an interface to support dynamic dispatch.
@@ -27671,6 +27671,7 @@ func (p *SQLiteParser) Of_OF_fset() (localctx IOf_OF_fsetContext) {
 		p.Signed_number()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -27681,7 +27682,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDefault_DEFAULT__valueContext is an interface to support dynamic dispatch.
@@ -27788,6 +27788,7 @@ func (p *SQLiteParser) Default_DEFAULT__value() (localctx IDefault_DEFAULT__valu
 		p.Signed_number()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -27798,7 +27799,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPartition_byContext is an interface to support dynamic dispatch.
@@ -27968,6 +27968,7 @@ func (p *SQLiteParser) Partition_by() (localctx IPartition_byContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -27978,7 +27979,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOrder_by_exprContext is an interface to support dynamic dispatch.
@@ -28142,6 +28142,7 @@ func (p *SQLiteParser) Order_by_expr() (localctx IOrder_by_exprContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -28152,7 +28153,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOrder_by_expr_asc_descContext is an interface to support dynamic dispatch.
@@ -28272,6 +28272,7 @@ func (p *SQLiteParser) Order_by_expr_asc_desc() (localctx IOrder_by_expr_asc_des
 		p.Order_by_expr_asc_desc()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -28282,7 +28283,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpr_asc_descContext is an interface to support dynamic dispatch.
@@ -28513,6 +28513,7 @@ func (p *SQLiteParser) Expr_asc_desc() (localctx IExpr_asc_descContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -28523,7 +28524,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInitial_selectContext is an interface to support dynamic dispatch.
@@ -28617,6 +28617,7 @@ func (p *SQLiteParser) Initial_select() (localctx IInitial_selectContext) {
 		p.Select_stmt()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -28627,7 +28628,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IRecursive__selectContext is an interface to support dynamic dispatch.
@@ -28721,6 +28721,7 @@ func (p *SQLiteParser) Recursive__select() (localctx IRecursive__selectContext) 
 		p.Select_stmt()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -28731,7 +28732,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUnary_operatorContext is an interface to support dynamic dispatch.
@@ -28837,6 +28837,7 @@ func (p *SQLiteParser) Unary_operator() (localctx IUnary_operatorContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -28847,7 +28848,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IError_messageContext is an interface to support dynamic dispatch.
@@ -28933,6 +28933,7 @@ func (p *SQLiteParser) Error_message() (localctx IError_messageContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -28943,7 +28944,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IModule_argumentContext is an interface to support dynamic dispatch.
@@ -29073,6 +29073,7 @@ func (p *SQLiteParser) Module_argument() (localctx IModule_argumentContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -29083,7 +29084,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IColumn_aliasContext is an interface to support dynamic dispatch.
@@ -29179,6 +29179,7 @@ func (p *SQLiteParser) Column_alias() (localctx IColumn_aliasContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -29189,7 +29190,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeywordContext is an interface to support dynamic dispatch.
@@ -30060,6 +30060,7 @@ func (p *SQLiteParser) Keyword() (localctx IKeywordContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30070,7 +30071,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INameContext is an interface to support dynamic dispatch.
@@ -30164,6 +30164,7 @@ func (p *SQLiteParser) Name() (localctx INameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30174,7 +30175,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunction_nameContext is an interface to support dynamic dispatch.
@@ -30268,6 +30268,7 @@ func (p *SQLiteParser) Function_name() (localctx IFunction_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30278,7 +30279,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IQualified_function_nameContext is an interface to support dynamic dispatch.
@@ -30414,6 +30414,7 @@ func (p *SQLiteParser) Qualified_function_name() (localctx IQualified_function_n
 		p.Function_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30424,7 +30425,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISchema_nameContext is an interface to support dynamic dispatch.
@@ -30518,6 +30518,7 @@ func (p *SQLiteParser) Schema_name() (localctx ISchema_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30528,7 +30529,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_nameContext is an interface to support dynamic dispatch.
@@ -30622,6 +30622,7 @@ func (p *SQLiteParser) Table_name() (localctx ITable_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30632,7 +30633,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_or_index_nameContext is an interface to support dynamic dispatch.
@@ -30726,6 +30726,7 @@ func (p *SQLiteParser) Table_or_index_name() (localctx ITable_or_index_nameConte
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30736,7 +30737,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INew_table_nameContext is an interface to support dynamic dispatch.
@@ -30830,6 +30830,7 @@ func (p *SQLiteParser) New_table_name() (localctx INew_table_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30840,7 +30841,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IColumn_nameContext is an interface to support dynamic dispatch.
@@ -30934,6 +30934,7 @@ func (p *SQLiteParser) Column_name() (localctx IColumn_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -30944,7 +30945,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICollation_nameContext is an interface to support dynamic dispatch.
@@ -31038,6 +31038,7 @@ func (p *SQLiteParser) Collation_name() (localctx ICollation_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31048,7 +31049,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForeign_tableContext is an interface to support dynamic dispatch.
@@ -31142,6 +31142,7 @@ func (p *SQLiteParser) Foreign_table() (localctx IForeign_tableContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31152,7 +31153,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIndex_nameContext is an interface to support dynamic dispatch.
@@ -31246,6 +31246,7 @@ func (p *SQLiteParser) Index_name() (localctx IIndex_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31256,7 +31257,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITrigger_nameContext is an interface to support dynamic dispatch.
@@ -31350,6 +31350,7 @@ func (p *SQLiteParser) Trigger_name() (localctx ITrigger_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31360,7 +31361,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IView_nameContext is an interface to support dynamic dispatch.
@@ -31454,6 +31454,7 @@ func (p *SQLiteParser) View_name() (localctx IView_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31464,7 +31465,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IModule_nameContext is an interface to support dynamic dispatch.
@@ -31558,6 +31558,7 @@ func (p *SQLiteParser) Module_name() (localctx IModule_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31568,7 +31569,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPragma_nameContext is an interface to support dynamic dispatch.
@@ -31662,6 +31662,7 @@ func (p *SQLiteParser) Pragma_name() (localctx IPragma_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31672,7 +31673,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISavepoint_nameContext is an interface to support dynamic dispatch.
@@ -31766,6 +31766,7 @@ func (p *SQLiteParser) Savepoint_name() (localctx ISavepoint_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31776,7 +31777,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_aliasContext is an interface to support dynamic dispatch.
@@ -31872,6 +31872,7 @@ func (p *SQLiteParser) Table_alias() (localctx ITable_aliasContext) {
 		}
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31882,7 +31883,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_alias_fallbackContext is an interface to support dynamic dispatch.
@@ -31976,6 +31976,7 @@ func (p *SQLiteParser) Table_alias_fallback() (localctx ITable_alias_fallbackCon
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -31986,7 +31987,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITransaction_nameContext is an interface to support dynamic dispatch.
@@ -32080,6 +32080,7 @@ func (p *SQLiteParser) Transaction_name() (localctx ITransaction_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32090,7 +32091,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWindow_nameContext is an interface to support dynamic dispatch.
@@ -32184,6 +32184,7 @@ func (p *SQLiteParser) Window_name() (localctx IWindow_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32194,7 +32195,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAliasContext is an interface to support dynamic dispatch.
@@ -32288,6 +32288,7 @@ func (p *SQLiteParser) Alias() (localctx IAliasContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32298,7 +32299,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFilenameContext is an interface to support dynamic dispatch.
@@ -32392,6 +32392,7 @@ func (p *SQLiteParser) Filename() (localctx IFilenameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32402,7 +32403,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBase_window_nameContext is an interface to support dynamic dispatch.
@@ -32496,6 +32496,7 @@ func (p *SQLiteParser) Base_window_name() (localctx IBase_window_nameContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32506,7 +32507,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISimple_funcContext is an interface to support dynamic dispatch.
@@ -32600,6 +32600,7 @@ func (p *SQLiteParser) Simple_func() (localctx ISimple_funcContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32610,7 +32611,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAggregate_funcContext is an interface to support dynamic dispatch.
@@ -32704,6 +32704,7 @@ func (p *SQLiteParser) Aggregate_func() (localctx IAggregate_funcContext) {
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32714,7 +32715,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITable_function_nameContext is an interface to support dynamic dispatch.
@@ -32808,6 +32808,7 @@ func (p *SQLiteParser) Table_function_name() (localctx ITable_function_nameConte
 		p.Any_name()
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -32818,7 +32819,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAny_nameContext is an interface to support dynamic dispatch.
@@ -33007,6 +33007,7 @@ func (p *SQLiteParser) Any_name() (localctx IAny_nameContext) {
 		goto errorExit
 	}
 
+	goto errorExit
 errorExit:
 	if p.HasError() {
 		v := p.GetError()
@@ -33017,7 +33018,6 @@ errorExit:
 	}
 	p.ExitRule()
 	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *SQLiteParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {

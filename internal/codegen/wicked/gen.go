@@ -155,6 +155,9 @@ func Generate(ctx context.Context, req *plugin.GenerateRequest) (*plugin.Generat
 	}
 	var missing []error
 	for _, q := range queries {
+		if q.Option.SQLTimeout > 0 && q.Cmd != metadata.CmdOne && q.Cmd != metadata.CmdMany {
+			return nil, fmt.Errorf("%s/%s: sql_timeout requires a cached :one or :many query", options.Package, q.MethodName)
+		}
 		if q.Option.Timeout == 0 {
 			missing = append(missing, fmt.Errorf("%s/%s does not have a timeout option", options.Package, q.MethodName))
 		}

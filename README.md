@@ -69,6 +69,10 @@ SELECT * FROM books WHERE id = @id;
 Run `sqlc generate` to generate code, or `sqlc diff` to check that it is up to date.
 Existing wicked projects keep the same configuration and commands.
 
+For cached reads, optional `-- -- sql_timeout: 250ms` starts a separate SQL budget
+after cache lookup while retaining `timeout` as the overall bound. See the guide
+for the combined budget example; existing queries keep their current behavior.
+
 See the [guide](GUIDE.md) for schema conventions, query options, and runtime setup,
 or [bookstore](https://github.com/Stumble/bookstore) for a working example.
 [Upstream documentation](https://docs.sqlc.dev) covers standard sqlc features.
