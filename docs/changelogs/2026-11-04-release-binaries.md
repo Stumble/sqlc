@@ -45,7 +45,9 @@ binaries for several platforms with an install script that checks the SHA-256.
 - D3 The build steps live in the workflow, not the Makefile, so a manual run
   can build tags older than this change (v2.4.0); the version flag matches the
   Makefile's.
-- D4 Go: newest patch of 1.26 (go.mod's version).
+- D4 Go: exactly the tag's go.mod version (`go 1.26.10` for v2.4.1). The first
+  v2.4.1 run used `1.26`, which setup-go resolved to a cached 1.26.7 on
+  `macos-15-intel`; go.mod refused it.
 - R1 GitHub runner labels (`macos-15-intel`, `ubuntu-24.04-arm`) are checked
   only when the workflow first runs.
 

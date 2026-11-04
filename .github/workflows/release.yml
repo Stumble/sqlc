@@ -25,8 +25,6 @@ concurrency:
 
 env:
   TAG: ${{ inputs.tag || github.ref_name }}
-  # Go release used for the binaries: the newest patch of go.mod's version.
-  GO_VERSION: "1.26"
 
 jobs:
   build:
@@ -54,6 +52,11 @@ jobs:
         run: |
           echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || { echo "not a release tag: $TAG" >&2; exit 1; }
           echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          # Go release used for the binaries: exactly the tag's go.mod version
+          # (a bare "1.26" can resolve to an older cached patch on the runner).
+          go_version="$(awk '$1 == "go" { print $2 }' go.mod)"
+          test -n "$go_version" || { echo "no go directive in go.mod" >&2; exit 1; }
+          echo "GO_VERSION=$go_version" >> "$GITHUB_ENV"
           # Same version string as `make build` from the tag.
           echo "LDFLAGS=-s -w -X github.com/sqlc-dev/sqlc/internal/info.Version=${TAG}-wicked-fork" >> "$GITHUB_ENV"
 
