@@ -34,13 +34,21 @@ the wicked backend.
 
 ## Use it
 
-Build the current `main` branch with the Go version specified in [go.mod](go.mod):
+Install a release binary (Linux, macOS; the SHA-256 is checked):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.1
+```
+
+Or build the current `main` branch with the Go version specified in [go.mod](go.mod):
 
 ```sh
 git clone https://github.com/Stumble/sqlc.git
 cd sqlc
 make install
 ```
+
+See [GUIDE.md](GUIDE.md#install) for platforms, checksums and Windows.
 
 Select the backend in `sqlc.yaml`:
 

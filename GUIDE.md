@@ -52,6 +52,29 @@ your customers are disappointed, or (2) before the product is launched, writing 
 
 ## Install
 
+Releases from v2.4.1 on ship binaries for Linux (amd64, arm64; static, any
+distribution), macOS (amd64, arm64; 12 or later) and Windows (amd64), with a
+`checksums.txt` and build provenance. `scripts/install.sh` downloads one,
+checks its SHA-256 and installs it into `$(go env GOPATH)/bin` (or
+`INSTALL_DIR`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.1
+sqlc version   # v2.4.1-wicked-fork
+```
+
+Set `SQLC_SHA256` to the archive's checksum to accept only that archive (a
+project that pins sqlc should do this). `gh attestation verify <archive> -R
+Stumble/sqlc` checks that an archive was built by this repository's release
+workflow. On Windows, download `sqlc_<version>_windows_amd64.zip` from the
+release.
+
+The Linux and macOS binaries use the native PostgreSQL parser (CGO). The
+Windows binary, and builds with `CGO_ENABLED=0`, use its WebAssembly build:
+same output, about two seconds slower per run.
+
+### Build from source
+
 Build this fork from source using the Go version required by [go.mod](go.mod).
 The default build uses CGO and requires a C compiler. Ensure Go's installation
 directory (`GOBIN`, or `GOPATH/bin` when unset) is on your `PATH`.
