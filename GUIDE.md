@@ -52,15 +52,15 @@ your customers are disappointed, or (2) before the product is launched, writing 
 
 ## Install
 
-Releases from v2.4.0 on ship binaries for Linux (amd64, arm64; static, any
+Releases from v2.4.1 on ship binaries for Linux (amd64, arm64; static, any
 distribution), macOS (amd64, arm64; 12 or later) and Windows (amd64), with a
 `checksums.txt` and build provenance. `scripts/install.sh` downloads one,
 checks its SHA-256 and installs it into `$(go env GOPATH)/bin` (or
 `INSTALL_DIR`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.0
-sqlc version   # v2.4.0-wicked-fork
+curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.1
+sqlc version   # v2.4.1-wicked-fork
 ```
 
 Set `SQLC_SHA256` to the archive's checksum to accept only that archive (a

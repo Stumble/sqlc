@@ -2,8 +2,8 @@
 # Install a wicked-sqlc release binary after checking its SHA-256.
 #
 #   scripts/install.sh            # latest release
-#   scripts/install.sh v2.4.0     # a given release
-#   curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.0
+#   scripts/install.sh v2.4.1     # a given release
+#   curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.1
 #
 # Environment:
 #   INSTALL_DIR   where to put sqlc (default: $(go env GOPATH)/bin, else ~/.local/bin)

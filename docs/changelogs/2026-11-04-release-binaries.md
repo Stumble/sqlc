@@ -74,11 +74,14 @@ Local, v2.4.0 source, with the workflow's Linux build command:
 ## 6. Human Decisions
 
 - Yumin, 2026-11-04 (request above).
+- Yumin, 2026-11-04: govulncheck failed on `main`; fix the dependencies first
+  (#22) and publish the first binaries as v2.4.1 rather than attaching
+  binaries built from v2.4.0's vulnerable dependencies.
 
 ## 7. Outcome
 
 - [ ] Merged.
-- [ ] v2.4.0 binaries attached by a manual run.
+- [ ] v2.4.1 released by a tag push, with binaries.
 
 ## 8. Remaining Work
 

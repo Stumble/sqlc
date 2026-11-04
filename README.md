@@ -37,7 +37,7 @@ the wicked backend.
 Install a release binary (Linux, macOS; the SHA-256 is checked):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.0
+curl -fsSL https://raw.githubusercontent.com/Stumble/sqlc/main/scripts/install.sh | sh -s -- v2.4.1
 ```
 
 Or build the current `main` branch with the Go version specified in [go.mod](go.mod):
