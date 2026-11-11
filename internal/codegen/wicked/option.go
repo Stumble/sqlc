@@ -12,6 +12,7 @@ const (
 	WpgxOptionKeyCountIntent  = "count_intent"
 	WpgxOptionKeyTimeout      = "timeout"
 	WpgxOptionKeyAllowReplica = "allow_replica"
+	WpgxOptionKeyEach         = "each"
 )
 
 type WPgxOption struct {
@@ -20,6 +21,7 @@ type WPgxOption struct {
 	CountIntent  bool
 	Timeout      time.Duration
 	AllowReplica bool
+	Each         bool
 }
 
 func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgxOption, err error) {
@@ -59,6 +61,11 @@ func parseOption(options map[string]string, queryNames map[string]bool) (rv WPgx
 			if rv.Timeout < 1*time.Millisecond {
 				return rv, fmt.Errorf("timeout duration too short: %s", v)
 			}
+		case WpgxOptionKeyEach:
+			if v != "true" && v != "false" {
+				return rv, fmt.Errorf("invalid each value: %s", v)
+			}
+			rv.Each = v == "true"
 		case WpgxOptionKeyAllowReplica:
 			if v == "true" {
 				rv.AllowReplica = true

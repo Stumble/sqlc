@@ -113,3 +113,23 @@ func TestInvalidQueryOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestEachVisitorNames(t *testing.T) {
+	for _, tc := range []struct{ typ, arg, want string }{
+		{"int64", "", "visit"},
+		{"visit", "", "visit1"},
+		{"*visit", "", "visit1"},
+		{"map[string]visit.Item", "", "visit1"},
+		{"Box[visit.Value]", "", "visit1"},
+		{"visit.Box[visit1.Value]", "visit2", "visit3"},
+		{"int64", "visit", "visit1"},
+	} {
+		q := Query{Ret: QueryValue{Name: "row", Typ: tc.typ}}
+		if tc.arg != "" {
+			q.Arg = QueryValue{Name: tc.arg, Typ: "int64"}
+		}
+		if got := q.EachVisitName(); got != tc.want {
+			t.Errorf("type=%s arg=%s got=%s want=%s", tc.typ, tc.arg, got, tc.want)
+		}
+	}
+}

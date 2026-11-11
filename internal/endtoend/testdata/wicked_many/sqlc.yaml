@@ -1,0 +1,11 @@
+version: '2'
+sql:
+- schema: schema.sql
+  queries: query.sql
+  engine: postgresql
+  gen:
+    go:
+      sql_package: wpgx
+      package: manycompat
+      out: go
+      emit_interface: true
