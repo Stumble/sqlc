@@ -168,7 +168,7 @@ in chat, logs, git or review artifacts.
 
 ## 7. Outcome and Evidence
 
-The completed product candidate is `49ac2682cf881acaf52c66fa3df4eedec2617607`,
+The completed product content was verified at `49ac2682cf881acaf52c66fa3df4eedec2617607`,
 against `e0d9cae63e18e46c50e6bba7e17f6f1341f36df4`. Each is an independent,
 opt-in generated consumer; no wpgx or library dependency changes were necessary.
 CI follow-up C1 updates the Go patch version in go.mod and existing workflows.
@@ -238,7 +238,7 @@ GitHub; local scoped integration and generated-runtime tests cover this contract
 
 ### Review and dispositions
 
-Both agents explicitly accept the complete net diff at **49ac2682cf881acaf52c66fa3df4eedec2617607**:
+Both agents previously explicitly accepted the complete net diff at **49ac2682cf881acaf52c66fa3df4eedec2617607**:
 Codex main `baa9cfcd-d88f-424e-a8a3-6e095ee3d37b` and Claude reviewer
 `aee3fbde-9a50-4c30-94fe-ea3d7d1e4de6` (native conversation
 `af103b26-bc43-4187-80b6-a68a4e6613c8`). Same VM `env-woddv6j0`, owner and
@@ -332,8 +332,8 @@ C2 publication blocker (2026-11-11 US Pacific): GitHub rejected the push of
 the reviewed C1 follow-up because the temporary PAT lacks `workflow` scope.
 The published PR remains at 18ed706; the security patch and its review/evidence
 are retained locally. Repository push/admin role does not confer a missing PAT
-scope. The PR body records this distinction. The owner must enable the workflow
-permission before this patch can be published and final CI can become clean.
+scope. The PR body records this distinction. At that point workflow permission was required before publication; this
+blocker is now resolved as recorded below.
 No permission bypass or release/merge was attempted.
 
 The owned disposable PG container was removed and its absence verified after
@@ -352,3 +352,50 @@ can be reopened if later CI requires another product fix.
 - implementation-review-closed-tree.json: SHA256 `7b1f154eee28e7603a7736faaade4de9d65f6f69224610efc881e030a049a8ce`.
 
 - postgres-cleanup.json: SHA256 `f63b430740a027b5afb8b008b5f5704e2b0239f8f83e2c88d8b7476c5c4652c3`.
+
+
+Owner-requested final reconfirmation (2026-11-11 US Pacific): the owner added
+workflow permission. An actual push of 1416a5b, including the workflow changes,
+succeeded; PR #24's head was verified through GitHub. C2 is resolved. Builds and
+checks now run on the new published head; live PR status remains authoritative.
+
+At the owner's explicit request, the creating parent reopened the same tracked
+Claude reviewer session on the same VM, preserving native conversation
+`af103b26-bc43-4187-80b6-a68a4e6613c8`, child ID and treeParentId. The reviewer
+reverified its identity and the parent's complete children listing. Both Codex
+and Claude **explicitly endorse the design and accept the complete net diff
+`e0d9cae63e18e46c50e6bba7e17f6f1341f36df4..1416a5bde7a109d76de00c7d1dcda219d0221c3a`**.
+There is no unresolved actionable finding. Later changes in this final evidence
+commit are confined to changelog sections 7-8.
+
+Claude's new report distinguishes full source audit across the implementation
+rounds, independently executed fixture/generator/runtime/consumer checks, and
+inspection of the author's PG/race/runtime-version/1,031-file evidence. For this
+reconfirmation it proved non-document content matches the verified 49ac268
+byte for byte, reread key implementation/design choices and audited all new
+evidence prose. It did not claim to rerun all tests or remote CI. The endorsed
+design preserves exact legacy signatures with a typed Each companion, keeps
+policy in the visitor, separates normal stop from error, centralizes cleanup,
+bypasses cache for request-specific consumption and retains syntactic safety
+and existing routing/transaction constraints. Its limitations remain explicit.
+
+Optional O1 is intentionally unchanged, independently accepted by Claude:
+Each and the slice method share the SQL operation label and CountIntent policy.
+Close-based wpgx latency includes callback work, and explicit cancellation may
+appear as a context-canceled DB error under that label. Downstream adoption
+should account for this in metrics/alerts. Separate mode labels remain a possible
+future observability choice; no correctness/compatibility change is required.
+
+The follow-up delivery request was `594bc92b-e9d7-49e1-bd51-030beb61d352`,
+with factual-status/disposition request `6bc7631a-1e53-4bd7-bd5d-033b6387ff40`.
+The actual revised report, rather than delivery, supplies the acceptance.
+Both result summaries/hashes are preserved here before parent-managed reviewer
+completion. The dedicated reviewer has no continuing watch/cron responsibility.
+
+| Final reconfirmation artifact | SHA256 |
+|---|---|
+| owner-reconfirmation-main.md | `a7c9bf99385e2b7a8388bc39274a13f2f0d68001bd45ff296e8b4b8b7d9e70e2` |
+| owner-reconfirmation-review.md | `a7f40e374a2dda69957874f596ed66e7100d7d6361e167d06a3c50c77a8dca22` |
+| owner-reconfirmation-reopened-state.json | `26168ce4a6e463f0f2ca6e81c310e310b71788a422d8bae969ef4fd2497402cb` |
+| owner-reconfirmation-tree.json | `d6f65be59db2f0ba30bb28cfcbafbfd629a193a9202a8e76cfb5bdbaf73cca04` |
+| owner-reconfirmation-delivery.json | `090aaf878111fcd283d2dbfe19e7a29eb1cbf75cb83fe6fc4559e9e62df090a3` |
