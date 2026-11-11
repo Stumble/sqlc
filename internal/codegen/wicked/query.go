@@ -2,6 +2,8 @@ package wicked
 
 import (
 	"fmt"
+	goast "go/ast"
+	"go/parser"
 	"strings"
 
 	"github.com/sqlc-dev/sqlc/internal/codegen/golang/opts"
@@ -434,8 +436,15 @@ func (v QueryValue) IsTypePointer() bool { return strings.HasPrefix(v.Type(), "*
 // EachVisitName avoids collisions with scalar or expanded SQL parameters.
 func (q Query) EachVisitName() string {
 	used := map[string]bool{q.Ret.Name: true}
-	if qualifier, _, qualified := strings.Cut(strings.TrimLeft(q.Ret.Type(), "[]*"), "."); qualified {
-		used[qualifier] = true
+	// A visitor parameter can shadow a type or package used by new(T),
+	// including identifiers nested in generic, array or map types.
+	if typ, err := parser.ParseExpr(q.Ret.Type()); err == nil {
+		goast.Inspect(typ, func(node goast.Node) bool {
+			if ident, ok := node.(*goast.Ident); ok {
+				used[ident.Name] = true
+			}
+			return true
+		})
 	}
 	for _, arg := range q.Arg.Pairs() {
 		used[arg.Name] = true

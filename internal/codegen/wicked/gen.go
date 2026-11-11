@@ -171,34 +171,9 @@ func Generate(ctx context.Context, req *plugin.GenerateRequest) (*plugin.Generat
 }
 
 func validate(options *opts.Options, enums []Enum, structs []Struct, queries []Query) error {
-	names := map[string]bool{
-		"WithTx": true, "WithCache": true, "AsReadOnly": true,
-		"UseReplica": true, "GetCache": true, "GetConn": true,
-		"Dump": true, "Load": true,
-	}
-	for _, query := range queries {
-		names[query.MethodName] = true
-	}
-	for _, query := range queries {
-		if query.Option.Each && names[query.MethodName+"Each"] {
-			return fmt.Errorf("%s/%s: Each companion name conflicts: %sEach", options.Package, query.MethodName, query.MethodName)
-		}
-	}
-	if options.EmitInterface && hasEach(queries) {
-		for _, query := range queries {
-			if query.ConstantName == "EachQuerier" {
-				return fmt.Errorf("Each companion name conflicts with query constant: EachQuerier")
-			}
-		}
-		for _, strct := range structs {
-			if strct.Name == "EachQuerier" {
-				return fmt.Errorf("Each companion name conflicts with model: EachQuerier")
-			}
-		}
-		for _, enum := range enums {
-			if enum.Name == "EachQuerier" || "Null"+enum.Name == "EachQuerier" {
-				return fmt.Errorf("Each companion name conflicts with enum: EachQuerier")
-			}
+	if hasEach(queries) {
+		if err := validateEachNames(options, enums, structs, queries); err != nil {
+			return err
 		}
 	}
 	enumNames := make(map[string]struct{})
@@ -489,4 +464,58 @@ func hasEach(queries []Query) bool {
 		}
 	}
 	return false
+}
+
+// Check only declarations introduced by Each. Existing queries without the
+// annotation retain the original naming rules and output.
+func validateEachNames(options *opts.Options, enums []Enum, structs []Struct, queries []Query) error {
+	methods := map[string]bool{
+		"WithTx": true, "WithCache": true, "AsReadOnly": true,
+		"UseReplica": true, "GetCache": true, "GetConn": true,
+		"Dump": true, "Load": true,
+	}
+	declarations := make(map[string]string)
+	for _, enum := range enums {
+		declarations[enum.Name] = "enum"
+		declarations["Null"+enum.Name] = "enum"
+		for _, constant := range enum.Constants {
+			declarations[constant.Name] = "enum constant"
+		}
+	}
+	for _, strct := range structs {
+		declarations[strct.Name] = "model"
+	}
+	for _, query := range queries {
+		methods[query.MethodName] = true
+		if query.Cmd != metadata.CmdCopyFrom {
+			declarations[query.ConstantName] = "query constant"
+		}
+		if query.Cmd == metadata.CmdOne || query.Cmd == metadata.CmdMany {
+			declarations["_"+query.MethodName] = "helper"
+		}
+		if query.Arg.EmitStruct() {
+			declarations[query.Arg.Type()] = "parameter type"
+		}
+		if query.Ret.EmitStruct() {
+			declarations[query.Ret.Type()] = "row type"
+		}
+	}
+	for _, query := range queries {
+		if !query.Option.Each {
+			continue
+		}
+		name := query.MethodName + "Each"
+		if methods[name] {
+			return fmt.Errorf("%s/%s: Each companion name conflicts: %s", options.Package, query.MethodName, name)
+		}
+		if kind := declarations["_"+name]; kind != "" {
+			return fmt.Errorf("%s/%s: Each companion name conflicts with %s: _%s", options.Package, query.MethodName, kind, name)
+		}
+	}
+	if options.EmitInterface {
+		if kind := declarations["EachQuerier"]; kind != "" {
+			return fmt.Errorf("Each companion name conflicts with %s: EachQuerier", kind)
+		}
+	}
+	return nil
 }

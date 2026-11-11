@@ -3,6 +3,7 @@ package compat_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -24,16 +25,36 @@ func TestGeneratedEachPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	setup, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer setup.Close(ctx)
+	schema := pgx.Identifier{fmt.Sprintf("sqlc_each_%d", time.Now().UnixNano())}.Sanitize()
+	if _, err := setup.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		defer stop()
+		if _, err := setup.Exec(cleanup, "DROP SCHEMA "+schema+" CASCADE"); err != nil {
+			t.Errorf("schema cleanup: %v", err)
+		}
+	}()
 	pool, err := wpgx.NewPool(ctx, &wpgx.Config{
 		Username: cfg.User, Password: cfg.Password, Host: cfg.Host, Port: int(cfg.Port), DBName: cfg.Database,
 		MaxConns: 1, MinConns: 0, MaxConnLifetime: time.Minute, MaxConnIdleTime: time.Minute, AppName: "sqlc_each_test",
+		BeforeAcquire: func(ctx context.Context, conn *pgx.Conn) bool {
+			_, err := conn.Exec(ctx, "SET search_path TO "+schema)
+			return err == nil
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
 	conn := pool.WConn()
-	if _, err := conn.WExec(ctx, "setup", "DROP TABLE IF EXISTS books; CREATE TABLE books (id bigint PRIMARY KEY, value bytea NOT NULL)"); err != nil {
+	if _, err := conn.WExec(ctx, "setup", "CREATE TABLE books (id bigint PRIMARY KEY, value bytea NOT NULL)"); err != nil {
 		t.Fatal(err)
 	}
 	// More than one network buffer remains unread when the visitor first runs.

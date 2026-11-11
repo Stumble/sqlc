@@ -69,6 +69,7 @@ func TestWickedEachValidation(t *testing.T) {
 		{"cte", "-- name: PutBook :many\n-- -- timeout: 1s\n-- -- each: true\nWITH changed AS (DELETE FROM books RETURNING *) SELECT * FROM changed;", "each requires a read-only :many"},
 		{"nested_cte", "-- name: PutBook :many\n-- -- timeout: 1s\n-- -- each: true\nWITH changed AS (INSERT INTO books (id, value) VALUES (1, ''::bytea) RETURNING *) SELECT * FROM (SELECT * FROM changed) AS nested;", "each requires a read-only :many"},
 		{"value", "-- name: ListBooks :many\n-- -- timeout: 1s\n-- -- each: yes\nSELECT * FROM books;", "invalid each value"},
+		{"helper_constant_collision", "-- name: ListBooks :many\n-- -- timeout: 1s\n-- -- each: true\nSELECT * FROM books;\n-- name: _ListBooksEach :many\n-- -- timeout: 1s\nSELECT * FROM books;", "Each companion name conflicts"},
 		{"name_collision", "-- name: ListBooks :many\n-- -- timeout: 1s\n-- -- each: true\nSELECT * FROM books;\n-- name: ListBooksEach :many\n-- -- timeout: 1s\nSELECT * FROM books;", "Each companion name conflicts"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

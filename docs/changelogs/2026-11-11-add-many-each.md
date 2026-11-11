@@ -162,8 +162,8 @@ semantics and compatibility matrix, plus routine source-local implementation
 choices. No new product behavior is inferred from token availability.
 
 Credentials are project-scoped. The existing alva-bot01 identity has pull-only
-access to Stumble/sqlc and wpgx. The requested temporary fine-grained credential
-is limited to sqlc branch/PR work and CI reads. Its contents must never appear
+access to Stumble/sqlc and wpgx. This task uses the owner-provided temporary credential
+only for sqlc branch/PR work and CI reads. Its contents must never appear
 in chat, logs, git or review artifacts.
 
 ## 7. Outcome and Evidence
@@ -200,9 +200,18 @@ that pre-existing runtime behavior is not changed by Each.
 
 The full generated-fixture module compiled. A subsequent CLI build invocation
 was initially issued from that fixture directory, where ./cmd/sqlc does not
-exist; the root build is being rerun from the correct repository directory.
+exist; that invocation was corrected to use the repository root.
 Root `GOMAXPROCS=2 GOWORK=off go build -p=2 ./...` and the current CLI build passed. `buf lint` passed (the existing DEFAULT-category deprecation warning remains). Generated fixture `go test -race -p=2 -count=1 ./wicked_compat/go ./wicked_many/go ./wicked_each/go` passed. The repository has no lint-fix target; no unrelated lint/configuration changes were introduced. Independent code review remains pending.
 
 ## 8. Remaining Work
 
 Complete independent code review and PR publication. Downstream migration follows an approved generator release.
+
+
+Author review found two additional opt-in naming edges after the first
+independent acceptance: custom return types can shadow the visitor identifier,
+and private helpers/interfaces can collide with package-level declarations.
+Reserve identifiers from the full Go return-type AST and check every existing
+emitted declaration for new Each names. Targeted regressions cover both. The
+optional PG test now uses a unique owned schema rather than dropping a shared
+books table. The first independent code review accepted 5420baf. Author review then found these two naming edges; they are fixed with focused regression cases. Fresh verification and renewed independent acceptance are required for the new candidate.

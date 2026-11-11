@@ -111,15 +111,18 @@ func TestWickedProtocolFacts(t *testing.T) {
 	if facts.QueryHasMutation["GetBook"] || !facts.QueryHasMutation["CreateBook"] {
 		t.Fatalf("mutation facts = %v", facts.QueryHasMutation)
 	}
-	unsupported := *c.Result()
-	unsupported.Queries = []*compiler.Query{{
-		Metadata: metadata.Metadata{Name: "Unsupported", Cmd: ":many"},
-		RawStmt: &ast.RawStmt{Stmt: &ast.SelectStmt{WithClause: &ast.WithClause{
-			Ctes: &ast.List{Items: []ast.Node{&ast.CommonTableExpr{Ctequery: &ast.TODO{}}}},
-		}}},
-	}}
-	if !codeGenRequest(&unsupported, combined).GetWicked().QueryHasMutation["Unsupported"] {
-		t.Fatal("unsupported CTE statement was classified as a read")
+	for name, statement := range map[string]*ast.SelectStmt{
+		"unsupported CTE": {WithClause: &ast.WithClause{Ctes: &ast.List{Items: []ast.Node{&ast.CommonTableExpr{Ctequery: &ast.TODO{}}}}}},
+		"SELECT INTO":     {IntoClause: &ast.IntoClause{}},
+	} {
+		unsupported := *c.Result()
+		unsupported.Queries = []*compiler.Query{{
+			Metadata: metadata.Metadata{Name: "Unsupported", Cmd: ":many"},
+			RawStmt:  &ast.RawStmt{Stmt: statement},
+		}}
+		if !codeGenRequest(&unsupported, combined).GetWicked().QueryHasMutation["Unsupported"] {
+			t.Fatalf("%s was classified as a read", name)
+		}
 	}
 	blob, err := proto.Marshal(req)
 	if err != nil {
