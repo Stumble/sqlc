@@ -327,3 +327,28 @@ C1 final review evidence (same verified Codex parent/Claude child and VM):
 | security-patch-verification.md | `4b03f270323de3f56f2d449226f91f82f7808951380cdab39e9bb1ef9b19d279` |
 | security-patch-local-checks.log | `ef26ba4e279161c4a7d0d281d0a2bbaeda250cb47504b63a2adacb0f52b0913e` |
 | consumer-compat/results.json | `eecb640bbadfdb0704656bc29f194af57fe92f67bd194d28f5998f60ca814b73` |
+
+C2 publication blocker (2026-11-11 US Pacific): GitHub rejected the push of
+the reviewed C1 follow-up because the temporary PAT lacks `workflow` scope.
+The published PR remains at 18ed706; the security patch and its review/evidence
+are retained locally. Repository push/admin role does not confer a missing PAT
+scope. The PR body records this distinction. The owner must enable the workflow
+permission before this patch can be published and final CI can become clean.
+No permission bypass or release/merge was attempted.
+
+The owned disposable PG container was removed and its absence verified after
+all checks. The completed dedicated Claude reviewer was closed by its creating
+parent after preserving both acceptances and report hashes. Closed state was
+verified with unchanged native ID/treeParentId, live=false and retained parent
+children listing. It had no cron or continuing responsibility. Review history
+can be reopened if later CI requires another product fix.
+
+- implementation-review-completion.json: SHA256 `de2f4be5c48df3e0aa8cfe0daac6286deb28fe18fd437116a2c3e9dc82cabdc0`.
+
+- implementation-review-close.json: SHA256 `5e4550142cbddb59778cdfdc14a7e3fc664120356f4d0a207480a83d1f7376d0`.
+
+- implementation-review-closed-state.json: SHA256 `ae205f0fc61be5fe5d93f844aa6bf0b46cbe470ea66e037a696e62efaf329234`.
+
+- implementation-review-closed-tree.json: SHA256 `7b1f154eee28e7603a7736faaade4de9d65f6f69224610efc881e030a049a8ce`.
+
+- postgres-cleanup.json: SHA256 `f63b430740a027b5afb8b008b5f5704e2b0239f8f83e2c88d8b7476c5c4652c3`.
