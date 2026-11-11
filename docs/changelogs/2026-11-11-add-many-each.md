@@ -121,7 +121,7 @@ The approved public signature and loop/cleanup design map to these locations.
 - [x] Prove generated runtime behavior and scoped integration semantics.
 - [x] Compare non-opt-in fixture/consumer output against baseline; inspect goldens.
 - [x] Update GUIDE and complete author verification, independent Claude review.
-- [ ] With verified project credentials, publish branch/PR and monitor checks.
+- [x] With verified project credentials, publish branch/PR and monitor checks.
 
 ## 5. Verification and E2E Design
 
@@ -284,7 +284,11 @@ above so the record does not depend on those files remaining accessible.
 
 ## 8. Remaining Work
 
-Publish the reviewed branch/PR and monitor current-head CI/review feedback.
+Published ready-for-review PR [#24](https://github.com/Stumble/sqlc/pull/24)
+on branch `yumin-xia/many-each-hooks`. Current-head CI and feedback are monitored
+on the PR; their live status is authoritative. Initial publication succeeded
+2026-11-11 10:26 PST using the task-specific owner credential, without changing
+the shared GitHub identity. This final commit updates evidence only.
 The owner retains merge and release authority. Downstream migration of the six
 handwritten readers follows an approved generator release and must preserve
 per-reader abort/drain policies and SQL single-value guards. Existing feed-search
