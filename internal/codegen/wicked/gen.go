@@ -35,6 +35,7 @@ type tmplCtx struct {
 	EmitDBTags                bool
 	EmitPreparedQueries       bool
 	EmitInterface             bool
+	HasEach                   bool
 	EmitEmptySlices           bool
 	EmitMethodsWithDBArgument bool
 	EmitEnumValidMethod       bool
@@ -170,6 +171,36 @@ func Generate(ctx context.Context, req *plugin.GenerateRequest) (*plugin.Generat
 }
 
 func validate(options *opts.Options, enums []Enum, structs []Struct, queries []Query) error {
+	names := map[string]bool{
+		"WithTx": true, "WithCache": true, "AsReadOnly": true,
+		"UseReplica": true, "GetCache": true, "GetConn": true,
+		"Dump": true, "Load": true,
+	}
+	for _, query := range queries {
+		names[query.MethodName] = true
+	}
+	for _, query := range queries {
+		if query.Option.Each && names[query.MethodName+"Each"] {
+			return fmt.Errorf("%s/%s: Each companion name conflicts: %sEach", options.Package, query.MethodName, query.MethodName)
+		}
+	}
+	if options.EmitInterface && hasEach(queries) {
+		for _, query := range queries {
+			if query.ConstantName == "EachQuerier" {
+				return fmt.Errorf("Each companion name conflicts with query constant: EachQuerier")
+			}
+		}
+		for _, strct := range structs {
+			if strct.Name == "EachQuerier" {
+				return fmt.Errorf("Each companion name conflicts with model: EachQuerier")
+			}
+		}
+		for _, enum := range enums {
+			if enum.Name == "EachQuerier" || "Null"+enum.Name == "EachQuerier" {
+				return fmt.Errorf("Each companion name conflicts with enum: EachQuerier")
+			}
+		}
+	}
 	enumNames := make(map[string]struct{})
 	for _, enum := range enums {
 		enumNames[enum.Name] = struct{}{}
@@ -212,6 +243,7 @@ func generate(req *plugin.GenerateRequest, options *opts.Options, enums []Enum, 
 		DumpLoader:                dumploader,
 		RawSchemaSQL:              req.GetWicked().PrimarySchemaSql,
 		EmitInterface:             false,
+		HasEach:                   hasEach(queries),
 		EmitJSONTags:              true,
 		JsonTagsIDUppercase:       false,
 		EmitDBTags:                false,
@@ -448,4 +480,13 @@ func filterUnusedStructs(enums []Enum, structs []Struct, queries []Query) ([]Enu
 	}
 
 	return keepEnums, keepStructs
+}
+
+func hasEach(queries []Query) bool {
+	for _, query := range queries {
+		if query.Option.Each {
+			return true
+		}
+	}
+	return false
 }

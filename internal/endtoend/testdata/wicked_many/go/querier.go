@@ -9,9 +9,13 @@ import (
 )
 
 type Querier interface {
+	DeleteAndList(ctx context.Context, beforeID int64) ([]DeleteAndListRow, error)
+
 	ListBooks(ctx context.Context, minID int64) ([]Book, error)
 
 	ListCachedBooks(ctx context.Context) ([]Book, error)
+
+	ListCachedRange(ctx context.Context, arg ListCachedRangeParams) ([]Book, error)
 
 	ListIDs(ctx context.Context) ([]int64, error)
 

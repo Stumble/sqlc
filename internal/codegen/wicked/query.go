@@ -430,3 +430,27 @@ type InvalidateParam struct {
 }
 
 func (v QueryValue) IsTypePointer() bool { return strings.HasPrefix(v.Type(), "*") }
+
+// EachVisitName avoids collisions with scalar or expanded SQL parameters.
+func (q Query) EachVisitName() string {
+	used := map[string]bool{q.Ret.Name: true}
+	if qualifier, _, qualified := strings.Cut(strings.TrimLeft(q.Ret.Type(), "[]*"), "."); qualified {
+		used[qualifier] = true
+	}
+	for _, arg := range q.Arg.Pairs() {
+		used[arg.Name] = true
+	}
+	name := "visit"
+	for suffix := 1; used[name]; suffix++ {
+		name = fmt.Sprintf("visit%d", suffix)
+	}
+	return name
+}
+
+// EachScan reuses the existing decoder with a local name independent of SQL
+// column names, which may also be control-flow names such as more or qctx.
+func (q Query) EachScan() string {
+	ret := q.Ret
+	ret.Name = "eachRow"
+	return ret.Scan()
+}

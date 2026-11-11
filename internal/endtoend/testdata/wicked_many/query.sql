@@ -23,3 +23,13 @@ SELECT id FROM books ORDER BY id;
 INSERT INTO books (id, value) VALUES (@id, @value)
 ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value
 RETURNING id, value;
+
+-- name: ListCachedRange :many
+-- -- timeout: 1s
+-- -- cache: 5s
+SELECT id, value FROM books WHERE id >= @from_id AND id <= @to_id ORDER BY id;
+
+-- name: DeleteAndList :many
+-- -- timeout: 1s
+WITH changed AS (DELETE FROM books WHERE id < @before_id RETURNING *)
+SELECT id, value FROM changed ORDER BY id;

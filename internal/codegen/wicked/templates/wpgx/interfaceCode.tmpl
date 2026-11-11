@@ -9,4 +9,14 @@ type Querier interface {
 {{end}}
 }
 var _ Querier = (*Queries)(nil)
+{{if .HasEach}}
+
+// EachQuerier is separate so existing Querier implementations remain valid.
+type EachQuerier interface {
+{{range .GoQueries}}{{if .Option.Each}}
+    {{.MethodName}}Each(ctx context.Context, {{if .Arg.Pair}}{{.Arg.Pair}},{{end}} {{.EachVisitName}} func(context.Context, {{.Ret.Type}}) (more bool, err error)) error
+{{end}}{{end}}
+}
+var _ EachQuerier = (*Queries)(nil)
+{{end}}
 {{end}}

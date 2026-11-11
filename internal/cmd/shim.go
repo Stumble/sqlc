@@ -7,6 +7,7 @@ import (
 	"github.com/sqlc-dev/sqlc/internal/info"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
 	"github.com/sqlc-dev/sqlc/internal/sql/ast"
+	"github.com/sqlc-dev/sqlc/internal/sql/astutils"
 	"github.com/sqlc-dev/sqlc/internal/sql/catalog"
 )
 
@@ -238,10 +239,31 @@ func codeGenRequest(r *compiler.Result, settings config.CombinedSettings) *plugi
 			PrimarySchemaSql:  r.Wicked.PrimarySchemaSQL,
 			PrimaryRelation:   &plugin.Identifier{Catalog: rel.Catalog, Schema: rel.Schema, Name: rel.Name},
 			QueryIsSelect:     make(map[string]bool, len(r.Queries)),
+			QueryHasMutation:  make(map[string]bool, len(r.Queries)),
 		}
 		for _, q := range r.Queries {
 			_, isSelect := q.RawStmt.Stmt.(*ast.SelectStmt)
 			facts.QueryIsSelect[q.Metadata.Name] = isSelect
+			hasMutation := false
+			astutils.Walk(astutils.VisitorFunc(func(node ast.Node) {
+				switch n := node.(type) {
+				case *ast.InsertStmt, *ast.UpdateStmt, *ast.DeleteStmt:
+					hasMutation = true
+				case *ast.CommonTableExpr:
+					// Unsupported CTE statements (for example MERGE in a
+					// parser version without that node) cannot opt into reads.
+					switch n.Ctequery.(type) {
+					case *ast.SelectStmt, *ast.InsertStmt, *ast.UpdateStmt, *ast.DeleteStmt:
+					default:
+						hasMutation = true
+					}
+				case *ast.SelectStmt:
+					if n.IntoClause != nil {
+						hasMutation = true
+					}
+				}
+			}), q.RawStmt.Stmt)
+			facts.QueryHasMutation[q.Metadata.Name] = hasMutation
 		}
 		req.BackendMetadata = &plugin.GenerateRequest_Wicked{Wicked: facts}
 	}

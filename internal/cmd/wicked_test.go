@@ -16,8 +16,10 @@ import (
 	"github.com/sqlc-dev/sqlc/internal/codegen/wicked"
 	"github.com/sqlc-dev/sqlc/internal/compiler"
 	"github.com/sqlc-dev/sqlc/internal/config"
+	"github.com/sqlc-dev/sqlc/internal/metadata"
 	"github.com/sqlc-dev/sqlc/internal/opts"
 	"github.com/sqlc-dev/sqlc/internal/plugin"
+	"github.com/sqlc-dev/sqlc/internal/sql/ast"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -106,6 +108,19 @@ func TestWickedProtocolFacts(t *testing.T) {
 	if v, present := facts.QueryIsSelect["CreateBook"]; !present || v {
 		t.Fatal("INSERT RETURNING is not a SELECT")
 	}
+	if facts.QueryHasMutation["GetBook"] || !facts.QueryHasMutation["CreateBook"] {
+		t.Fatalf("mutation facts = %v", facts.QueryHasMutation)
+	}
+	unsupported := *c.Result()
+	unsupported.Queries = []*compiler.Query{{
+		Metadata: metadata.Metadata{Name: "Unsupported", Cmd: ":many"},
+		RawStmt: &ast.RawStmt{Stmt: &ast.SelectStmt{WithClause: &ast.WithClause{
+			Ctes: &ast.List{Items: []ast.Node{&ast.CommonTableExpr{Ctequery: &ast.TODO{}}}},
+		}}},
+	}}
+	if !codeGenRequest(&unsupported, combined).GetWicked().QueryHasMutation["Unsupported"] {
+		t.Fatal("unsupported CTE statement was classified as a read")
+	}
 	blob, err := proto.Marshal(req)
 	if err != nil {
 		t.Fatal(err)
@@ -127,6 +142,13 @@ func TestWickedProtocolFacts(t *testing.T) {
 	}
 	if !proto.Equal(before, req) {
 		t.Fatal("generator modified its input request")
+	}
+	withoutSafety := proto.Clone(req).(*plugin.GenerateRequest)
+	withoutSafety.GetWicked().QueryHasMutation = nil
+	withoutSafety.Queries[0].Cmd = ":many"
+	withoutSafety.Queries[0].Comments = append(withoutSafety.Queries[0].Comments, "-- each: true")
+	if _, err := wicked.Generate(context.Background(), withoutSafety); err == nil || !strings.Contains(err.Error(), "statement safety metadata") {
+		t.Fatalf("missing safety facts err=%v", err)
 	}
 	standard := proto.Clone(req).(*plugin.GenerateRequest)
 	standard.BackendMetadata = nil

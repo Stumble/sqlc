@@ -227,6 +227,55 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
 {{- end }}
     return items, err
 }
+{{if .Option.Each}}
+
+// {{.MethodName}}Each visits rows in query order without collecting a result slice.
+// It directly queries the DB, bypassing the slice method's result cache.
+// Return true to continue or false to stop the whole read; to skip a row,
+// omit its output and return true. Errors are returned after rows are closed.
+// The query timeout covers the synchronous visitor and draining. The visitor
+// must respect ctx and must not query again on the same active connection.
+// Normal stop and visitor error drain by default; cancel a query-specific
+// caller context to abort transfer, which may invalidate its connection/tx.
+func (q *Queries) {{.MethodName}}Each(ctx context.Context, {{if .Arg.Pair}}{{.Arg.Pair}},{{end}} {{.EachVisitName}} func(context.Context, {{.Ret.Type}}) (more bool, err error)) error {
+    return _{{.MethodName}}Each(ctx, q.AsReadOnly(), {{if .Arg.Name}}{{.Arg.Name}},{{end}} {{.EachVisitName}})
+}
+
+{{if .AllowReplica}}
+// {{.MethodName}}Each has the same consumption and lifetime contract as Queries.{{.MethodName}}Each.
+func (q *ReadOnlyQueries) {{.MethodName}}Each(ctx context.Context, {{if .Arg.Pair}}{{.Arg.Pair}},{{end}} {{.EachVisitName}} func(context.Context, {{.Ret.Type}}) (more bool, err error)) error {
+    return _{{.MethodName}}Each(ctx, q, {{if .Arg.Name}}{{.Arg.Name}},{{end}} {{.EachVisitName}})
+}
+{{end}}
+
+func _{{.MethodName}}Each(ctx context.Context, q CacheQuerierConn, {{if .Arg.Pair}}{{.Arg.Pair}},{{end}} {{.EachVisitName}} func(context.Context, {{.Ret.Type}}) (more bool, err error)) error {
+    if {{.EachVisitName}} == nil {
+        return fmt.Errorf("{{.MethodName}}Each: nil visitor")
+    }
+    qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
+    defer cancel()
+    {{if .CountIntent}}q.GetConn().CountIntent("{{.UniqueLabel}}"){{end}}
+    rows, err := q.GetConn().WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
+    if err != nil {
+        return err
+    }
+    defer rows.Close()
+    for rows.Next() {
+        if err := qctx.Err(); err != nil { return err }
+        var eachRow *{{.Ret.Type}} = new({{.Ret.Type}})
+        if err := rows.Scan({{.EachScan}}); err != nil { return err }
+        more, err := {{.EachVisitName}}(qctx, *eachRow)
+        if err != nil { return err }
+        if err := qctx.Err(); err != nil { return err }
+        if !more { break }
+    }
+    // Close may drain pending results and surface a server error after a
+    // successful early stop. It must run before checking Err and cancelling.
+    rows.Close()
+    if err := rows.Err(); err != nil { return err }
+    return qctx.Err()
+}
+{{end}}
 {{end}}
 
 {{if eq .Cmd ":exec"}}

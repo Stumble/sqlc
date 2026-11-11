@@ -363,6 +363,12 @@ func buildQueries(req *plugin.GenerateRequest, options *opts.Options, structs []
 		if err != nil {
 			return nil, fmt.Errorf("%s/%s: %w", options.Package, query.Name, err)
 		}
+		if gq.Option.Each {
+			hasMutation, known := req.GetWicked().QueryHasMutation[query.Name]
+			if gq.Cmd != metadata.CmdMany || !isSelect || !known || hasMutation {
+				return nil, fmt.Errorf("%s/%s: each requires a read-only :many with statement safety metadata", options.Package, query.Name)
+			}
+		}
 		qs = append(qs, gq)
 	}
 	sort.Slice(qs, func(i, j int) bool { return qs[i].MethodName < qs[j].MethodName })

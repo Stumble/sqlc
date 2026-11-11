@@ -2,10 +2,11 @@
 
 ## 1. Background and Current State
 
-Wicked `:many` methods collect every row before returning. The 2026-10-14
-ALFS incident involved 2,920 synthdb rows totalling about 2 GB and a 5.2 GB
-heap. Six synthdb reads now maintain handwritten SQL/iteration to enforce
-request policies (alva-ai/synthdb#33). Feed-search PR #32 remains unchanged.
+Wicked `:many` methods collect every row before returning. Downstream Go
+services with variable-width records consequently maintain handwritten SQL
+iteration to enforce request policies. A row-count limit alone cannot bound
+the result size. Six existing downstream reads motivate the companion API;
+consumer migration remains a separate follow-up after a generator release.
 
 Current source is sqlc main e0d9cae. The wicked backend owns comment options,
 row types, collectors, caching and Dump/Load. Wpgx already exposes pgx.Rows.
@@ -42,9 +43,9 @@ only ordinary calls. Production inspection is unnecessary for this change.
   Normal stop preserves a separate channel so a late drain error remains visible.
 
 Single-row receive protection remains explicit SQL. Policies, row costing,
-ErrReadLimitExceeded and all-or-nothing application collectors stay in synthdb.
-Five existing readers retain explicit cancel on overflow; SearchVectors retains
-normal drain and its outer timeout across the read and subsequent count.
+domain errors and all-or-nothing application collectors stay in their clients.
+Downstream migration must preserve each reader's existing abort/drain policy
+and any outer deadline shared with subsequent queries.
 
 ## 3. Research, Findings, and Architecture Decision
 
@@ -80,7 +81,7 @@ R3 Standard []byte ownership differs from custom borrowing codecs. R4 Bool
 false means stop, not skip; generated docs/examples must be explicit.
 R5 A new generator release is needed before adopting the annotation; existing
 binaries fail on unknown options. R6 Exact downstream upgrades remain separate
-from this generator change, with published release and PR #32 boundaries.
+from this generator change, with generator publication/release boundaries.
 
 References: prior scratch proposal and AI-facing synthesis; pgx Rows and
 ForEachRow documentation; Go iter documentation; wicked option/query/interface
@@ -110,15 +111,15 @@ The approved public signature and loop/cleanup design map to these locations.
   verifies transaction reuse and explicit cancellation if available.
 - First publication is a branch/PR against Stumble/sqlc using owner-provided
   project credentials. Owner retains merge/release authority. Consumer code
-  migration follows publication/release separately, respecting synthdb#32.
+  migration follows publication/release separately, respecting existing downstream feature boundaries.
 
 ### Serial Implementation Checklist
 
 - [x] Characterize existing many generation and save an immutable baseline binary.
-- [ ] Add each option, AST safety metadata and focused rejection tests.
-- [ ] Generate companion methods/docs and separate optional interface.
-- [ ] Prove generated runtime behavior and scoped integration semantics.
-- [ ] Compare non-opt-in fixture/consumer output against baseline; inspect goldens.
+- [x] Add each option, AST safety metadata and focused rejection tests.
+- [x] Generate companion methods/docs and separate optional interface.
+- [x] Prove generated runtime behavior and scoped integration semantics.
+- [x] Compare non-opt-in fixture/consumer output against baseline; inspect goldens.
 - [ ] Update GUIDE and complete author verification, independent Claude review.
 - [ ] With verified project credentials, publish branch/PR and monitor checks.
 
@@ -136,7 +137,7 @@ Focused commands (from repository root, GOMAXPROCS=2, GOWORK=off):
 - `buf generate --path protos/plugin/codegen.proto` using installed tooling;
   inspect generated diff and restrict changes to the protocol source of truth.
 - `go build -p=2 -o ../sqlc-after ./cmd/sqlc`.
-- Run the compiled runtime fixture tests with `go test -p=2 -count=1 ./...`.
+- From `internal/endtoend/testdata`, run `go test -p=2 -count=1 ./wicked_compat/go ./wicked_many/go ./wicked_each/go`. Runtime contracts live in the existing wicked_compat CI suite and import the generated Each fixture, so existing CI executes them.
 - Run both binaries on isolated copies of the non-opt-in fixtures and real
   alva-backend/synthdb input at recorded revisions; require byte equality.
   Normalize only the version header if the two version strings differ.
@@ -167,8 +168,41 @@ in chat, logs, git or review artifacts.
 
 ## 7. Outcome and Evidence
 
-Baseline `../sqlc-before` built from e0d9cae. `GOMAXPROCS=2 GOWORK=off go test -p=2 -count=1 ./internal/cmd -run '^TestWickedManyCompatibility$'` passed before product-template changes, for both interface modes. The generated 443-line golden was inspected. Implementation verification remains pending.
+Baseline `../sqlc-before` built from e0d9cae. `GOMAXPROCS=2 GOWORK=off go test -p=2 -count=1 ./internal/cmd -run '^TestWickedManyCompatibility$'` passed before product-template changes, for both interface modes. The initial generated 443-line golden was inspected. It was subsequently
+expanded using the same immutable baseline binary to include cached struct
+parameters and a legacy data-modifying CTE. The expanded compatibility test
+passes with interfaces both enabled and disabled.
+
+Focused `go test -p=2 -count=1` passed for internal/cmd,
+internal/codegen/wicked, internal/compiler, internal/sql/astutils and
+internal/plugin. Feature tests first failed on the legacy compiler's unknown
+`each` option, then passed after implementation.
+
+The generated runtime suite passed in the testdata module. It exercises actual
+emitted methods, including Close-only failures after normal stop, primary-error
+precedence, panic, context/deadline, scalar/struct parameters, retained rows,
+replicas, CountIntent and cache bypass. It is imported by the pre-existing
+wicked_compat CI entrypoint, avoiding a separate unexecuted test suite.
+
+Eight isolated, immutable downstream input snapshots regenerated with both
+binaries produced 1,031 Go files with zero differences, including names and
+contents. Original working trees were not modified. Per-consumer HEADs and
+hashes are retained in the task's local compatibility results.
+
+Runtime checks passed with wpgx v0.3.1 (the fixture's current dependency),
+v0.3.4, v0.4.8, v0.4.9 and v0.5.0. A disposable postgres:16-alpine instance
+was bound only to localhost, limited to one CPU/512 MiB. The real PG test
+proved same-transaction reuse after normal stop and ordinary visitor error,
+primary-error preservation by Each on explicit abort, and pool recovery with a
+replacement connection. Optional integration is enabled with SQLC_EACH_TEST_DSN.
+Older wpgx transaction wrappers can overwrite an error during failed rollback;
+that pre-existing runtime behavior is not changed by Each.
+
+The full generated-fixture module compiled. A subsequent CLI build invocation
+was initially issued from that fixture directory, where ./cmd/sqlc does not
+exist; the root build is being rerun from the correct repository directory.
+Root `GOMAXPROCS=2 GOWORK=off go build -p=2 ./...` and the current CLI build passed. `buf lint` passed (the existing DEFAULT-category deprecation warning remains). Generated fixture `go test -race -p=2 -count=1 ./wicked_compat/go ./wicked_many/go ./wicked_each/go` passed. The repository has no lint-fix target; no unrelated lint/configuration changes were introduced. Independent code review remains pending.
 
 ## 8. Remaining Work
 
-Complete the checklist and record final verification, review and publication.
+Complete independent code review and PR publication. Downstream migration follows an approved generator release.

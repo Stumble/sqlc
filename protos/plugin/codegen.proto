@@ -145,6 +145,9 @@ message WickedMetadata {
   Identifier primary_relation = 3;
   // This means a top-level SELECT, not a proof that a query is read-only.
   map<string, bool> query_is_select = 4;
+  // A conservative rejection fact: writes, SELECT INTO or unsupported CTE statements.
+  // This is not a proof that called functions are free of side effects.
+  map<string, bool> query_has_mutation = 5;
 }
 
 message GenerateResponse {

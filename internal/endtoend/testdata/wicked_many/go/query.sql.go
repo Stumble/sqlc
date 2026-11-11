@@ -17,6 +17,49 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const deleteAndList = `-- name: DeleteAndList :many
+WITH changed AS (DELETE FROM books WHERE id < $1 RETURNING id, value)
+SELECT id, value FROM changed ORDER BY id
+`
+
+type DeleteAndListRow struct {
+	ID    int64
+	Value []byte
+}
+
+// -- timeout: 1s
+func (q *Queries) DeleteAndList(ctx context.Context, beforeID int64) ([]DeleteAndListRow, error) {
+	return _DeleteAndList(ctx, q.AsReadOnly(), beforeID)
+}
+
+func (q *ReadOnlyQueries) DeleteAndList(ctx context.Context, beforeID int64) ([]DeleteAndListRow, error) {
+	return _DeleteAndList(ctx, q, beforeID)
+}
+
+func _DeleteAndList(ctx context.Context, q CacheQuerierConn, beforeID int64) ([]DeleteAndListRow, error) {
+	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
+	defer cancel()
+	q.GetConn().CountIntent("manycompat.DeleteAndList")
+	rows, err := q.GetConn().WQuery(qctx, "manycompat.DeleteAndList", deleteAndList, beforeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DeleteAndListRow
+	for rows.Next() {
+		var i *DeleteAndListRow = new(DeleteAndListRow)
+		if err := rows.Scan(&i.ID, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, *i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, err
+}
+
 const listBooks = `-- name: ListBooks :many
 SELECT id, value FROM books WHERE id >= $1 ORDER BY id
 `
@@ -98,6 +141,68 @@ func _ListCachedBooks(ctx context.Context, q CacheQuerierConn) ([]Book, error) {
 	}
 	var items []Book
 	err := q.GetCache().GetWithTtl(qctx, "manycompat:ListCachedBooks:", &items, dbRead, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return items, err
+}
+
+const listCachedRange = `-- name: ListCachedRange :many
+SELECT id, value FROM books WHERE id >= $1 AND id <= $2 ORDER BY id
+`
+
+type ListCachedRangeParams struct {
+	FromID int64
+	ToID   int64
+}
+
+// CacheKey - cache key
+func (arg ListCachedRangeParams) CacheKey() string {
+	prefix := "manycompat:ListCachedRange:"
+	return prefix + hashIfLong(fmt.Sprintf("%+v,%+v", arg.FromID, arg.ToID))
+}
+
+// -- timeout: 1s
+// -- cache: 5s
+func (q *Queries) ListCachedRange(ctx context.Context, arg ListCachedRangeParams) ([]Book, error) {
+	return _ListCachedRange(ctx, q.AsReadOnly(), arg)
+}
+
+func (q *ReadOnlyQueries) ListCachedRange(ctx context.Context, arg ListCachedRangeParams) ([]Book, error) {
+	return _ListCachedRange(ctx, q, arg)
+}
+
+func _ListCachedRange(ctx context.Context, q CacheQuerierConn, arg ListCachedRangeParams) ([]Book, error) {
+	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
+	defer cancel()
+	q.GetConn().CountIntent("manycompat.ListCachedRange")
+	dbRead := func() (any, time.Duration, error) {
+		cacheDuration := time.Duration(time.Millisecond * 5000)
+		rows, err := q.GetConn().WQuery(qctx, "manycompat.ListCachedRange", listCachedRange, arg.FromID, arg.ToID)
+		if err != nil {
+			return []Book(nil), 0, err
+		}
+		defer rows.Close()
+		var items []Book
+		for rows.Next() {
+			var i *Book = new(Book)
+			if err := rows.Scan(&i.ID, &i.Value); err != nil {
+				return []Book(nil), 0, err
+			}
+			items = append(items, *i)
+		}
+		if err := rows.Err(); err != nil {
+			return []Book(nil), 0, err
+		}
+		return items, cacheDuration, nil
+	}
+	if q.GetCache() == nil {
+		items, _, err := dbRead()
+		return items.([]Book), err
+	}
+	var items []Book
+	err := q.GetCache().GetWithTtl(qctx, arg.CacheKey(), &items, dbRead, false, false)
 	if err != nil {
 		return nil, err
 	}

@@ -405,7 +405,7 @@ ORDER BY
 LIMIT @first;
 ```
 
-This wicked forked sqlc adds 3 abilities to query: cache, timeout and invalidate.
+This wicked fork supports cache, timeout, invalidation and opt-in row consumers.
 
 Options are written as `-- -- key: value` comments above each query. sqlc passes
 them through its standard query comments, and the wicked backend parses and
@@ -425,6 +425,68 @@ Btw, this syntax looks very similar as passing arguments to the underlying scrip
 ```bash
 npm run server -- --port=8080 // invokes `run server script with --port=8080`
 ```
+
+#### Consume rows with Each
+
+Enable a companion on a read-only `:many` query:
+
+```sql
+-- name: ListBooks :many
+-- -- timeout: 1s
+-- -- each: true
+SELECT * FROM books WHERE id >= @min_id ORDER BY id;
+```
+
+The existing `ListBooks` method still collects its result slice. The new
+`ListBooksEach` method takes a typed consumer and returns the final error:
+
+```go
+err := queries.ListBooksEach(ctx, minID,
+    func(ctx context.Context, book Book) (bool, error) {
+        if err := ctx.Err(); err != nil {
+            return false, err
+        }
+        if shouldSkip(book) {
+            return true, nil
+        }
+        if err := consume(book); err != nil {
+            return false, err
+        }
+        return true, nil
+    })
+```
+
+Return `true, nil` to continue. Return `false, nil` to stop the entire read
+successfully. To filter one row, omit its output and continue. A non-nil error
+ends consumption and is returned after cleanup. No result slice is collected
+by Each; application collectors should discard their local partial result on
+error when they require all-or-nothing output.
+
+Each directly queries the selected DB connection, bypassing result-cache reads,
+writes and singleflight, even if the slice method has a cache annotation.
+Timeout, CountIntent and connection/transaction/replica routing still apply.
+ReadOnlyQueries gets the companion only when replica access is allowed.
+When `emit_interface` is enabled, companions are in a separate `EachQuerier`;
+the original `Querier` method set stays the same. `each: false` disables a
+companion. The new annotation requires a generator release supporting it.
+
+The consumer is synchronous, holds the connection, and runs under the query
+context/deadline. It must respect that context and cannot reenter the same
+active transaction connection. Normal stop, error and panic close/drain rows
+before the query's own context is cancelled. A drain failure after normal stop
+is returned; a prior callback/scan error remains primary. Panic propagates after
+cleanup. To stop receiving remaining data, cancel a caller-created context
+scoped to this query. Explicit cancellation or timeout may close the physical
+connection and invalidate its transaction. Borrowing/custom codecs retain their
+own field-lifetime rules.
+
+Each is generated for SELECT reads, rejecting visible data-changing CTEs,
+unsupported CTE statements and SELECT INTO. This syntactic check does not prove
+absence of function side effects. Locking SELECTs follow the existing declared
+routing and transaction rules; draining can still acquire locks for remaining
+rows. Each does not bound the current row's receive or decode allocation. Keep
+SQL-level single-value protections where required, and implement request policy
+and domain errors in the consumer.
 
 #### Cache
 
