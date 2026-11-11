@@ -293,3 +293,16 @@ The owner retains merge and release authority. Downstream migration of the six
 handwritten readers follows an approved generator release and must preserve
 per-reader abort/drain policies and SQL single-value guards. Existing feed-search
 work is untouched. No runtime release or database migration is required.
+
+
+CI follow-up C1 (2026-11-11 US Pacific): current-head Windows cross-build
+failed while downloading grpc from proxy.golang.org (HTTP/2 INTERNAL_ERROR),
+which cancelled the other matrix builds. The vulnerability job independently
+reported GO-2026-6859 in the existing Go 1.26.10 standard library, fixed in
+1.26.11. The official [Go release history](https://go.dev/doc/devel/release#go1.26.11)
+records that security patch on 2026-11-10. Update the root build/release minimum
+and every existing CI Go pin to 1.26.11, keeping the same Go minor version.
+No library dependency or generated API changes. This necessary CI/security
+follow-up requires fresh generation/build/runtime checks and renewed complete
+cross-agent review before pushing. Prior product acceptance is historical
+until that review completes.
