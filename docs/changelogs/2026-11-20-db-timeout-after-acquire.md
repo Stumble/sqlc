@@ -26,10 +26,12 @@ record, Stumble/wpgx `docs/changelogs/2026-11-20-db-timeout-after-acquire.md`.
   lookups and fills are bounded by the Redis client's timeouts, not by T.
 - B3 — Each visitors receive the statement context from wpgx rows (falling
   back to the method context; `qctx` is reassigned, so no new local name can
-  collide with a SQL parameter). An ended statement context is reported with
-  `wpgx.ContextErr`: `ctx.Err()`, which also matches `wpgx.ErrDBTimeout` when
-  the database timeout ended it. After closing the rows only the caller's
-  context is checked.
+  collide with a SQL parameter). Each reports through `wpgx.StatementErr`: an
+  ended statement context, a visitor's error that is that context's deadline,
+  and, after closing the rows, a database timeout that expired while reading or
+  draining buffered rows all match `wpgx.ErrDBTimeout` (as the previous Each
+  failed when its query context expired). Other visitor and row errors stay
+  primary; the caller's context is checked last.
 - B4 — Generated files import `github.com/stumble/wpgx`; regenerated code
   needs a wpgx release with `WithDBTimeout` (compile-time check).
 - F1 — Missing timeouts still fail generation.

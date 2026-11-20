@@ -93,6 +93,26 @@ func TestGeneratedTimeoutPostgres(t *testing.T) {
 		}
 	})
 
+	t.Run("a_visitor_returning_the_deadline_reports_the_database_timeout", func(t *testing.T) {
+		err := q.ListBooksEach(ctx, 0, func(vctx context.Context, _ eachgen.Book) (bool, error) {
+			<-vctx.Done()
+			return false, vctx.Err()
+		})
+		if !errors.Is(err, wpgx.ErrDBTimeout) || !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
+	t.Run("draining_past_the_timeout_after_an_early_stop_fails", func(t *testing.T) {
+		slow := eachgen.New(&slowCloseConn{WGConn: pool.WConn()}, nil)
+		err := slow.ListBooksEach(ctx, 0, func(context.Context, eachgen.Book) (bool, error) {
+			return false, nil
+		})
+		if !errors.Is(err, wpgx.ErrDBTimeout) {
+			t.Fatalf("err=%v", err)
+		}
+	})
+
 	t.Run("a_blocked_query_reports_the_database_timeout", func(t *testing.T) {
 		locker, err := pgx.Connect(ctx, dsn)
 		if err != nil {
@@ -120,4 +140,27 @@ func TestGeneratedTimeoutPostgres(t *testing.T) {
 			t.Fatalf("two 1s timeouts took %s", elapsed)
 		}
 	})
+}
+
+// slowCloseConn returns rows whose Close waits until the statement context
+// ends, as a slow drain of buffered rows would.
+type slowCloseConn struct{ wpgx.WGConn }
+
+func (c *slowCloseConn) WQuery(ctx context.Context, name, sql string, args ...any) (pgx.Rows, error) {
+	rows, err := c.WGConn.WQuery(ctx, name, sql, args...)
+	if err != nil {
+		return rows, err
+	}
+	return slowCloseRows{rows}, nil
+}
+
+type slowCloseRows struct{ pgx.Rows }
+
+func (r slowCloseRows) Context() context.Context {
+	return r.Rows.(interface{ Context() context.Context }).Context()
+}
+
+func (r slowCloseRows) Close() {
+	<-r.Context().Done()
+	r.Rows.Close()
 }

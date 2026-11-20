@@ -89,7 +89,7 @@ func _ListBooksEach(ctx context.Context, q CacheQuerierConn, visit int64, visit1
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
@@ -98,9 +98,9 @@ func _ListBooksEach(ctx context.Context, q CacheQuerierConn, visit int64, visit1
 		}
 		more, err := visit1(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -108,10 +108,11 @@ func _ListBooksEach(ctx context.Context, q CacheQuerierConn, visit int64, visit1
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -202,7 +203,7 @@ func _ListCachedBooksEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
@@ -211,9 +212,9 @@ func _ListCachedBooksEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		}
 		more, err := visit(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -221,10 +222,11 @@ func _ListCachedBooksEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -301,7 +303,7 @@ func _ListFromVctxEach(ctx context.Context, q CacheQuerierConn, vctx int64, visi
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
@@ -310,9 +312,9 @@ func _ListFromVctxEach(ctx context.Context, q CacheQuerierConn, vctx int64, visi
 		}
 		more, err := visit(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -320,10 +322,11 @@ func _ListFromVctxEach(ctx context.Context, q CacheQuerierConn, vctx int64, visi
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -400,7 +403,7 @@ func _ListFromWpgxEach(ctx context.Context, q CacheQuerierConn, wpgx_ int64, vis
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
@@ -409,9 +412,9 @@ func _ListFromWpgxEach(ctx context.Context, q CacheQuerierConn, wpgx_ int64, vis
 		}
 		more, err := visit(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -419,10 +422,11 @@ func _ListFromWpgxEach(ctx context.Context, q CacheQuerierConn, wpgx_ int64, vis
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -499,7 +503,7 @@ func _ListIDsEach(ctx context.Context, q CacheQuerierConn, visit func(context.Co
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *int64 = new(int64)
@@ -508,9 +512,9 @@ func _ListIDsEach(ctx context.Context, q CacheQuerierConn, visit func(context.Co
 		}
 		more, err := visit(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -518,10 +522,11 @@ func _ListIDsEach(ctx context.Context, q CacheQuerierConn, visit func(context.Co
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -598,7 +603,7 @@ func _ListNamedScalarEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *int64 = new(int64)
@@ -607,9 +612,9 @@ func _ListNamedScalarEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		}
 		more, err := visit(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -617,10 +622,11 @@ func _ListNamedScalarEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -689,7 +695,7 @@ func _ListPrimaryBooksEach(ctx context.Context, q CacheQuerierConn, visit func(c
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
@@ -698,9 +704,9 @@ func _ListPrimaryBooksEach(ctx context.Context, q CacheQuerierConn, visit func(c
 		}
 		more, err := visit(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -708,10 +714,11 @@ func _ListPrimaryBooksEach(ctx context.Context, q CacheQuerierConn, visit func(c
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -793,7 +800,7 @@ func _ListRangeEach(ctx context.Context, q CacheQuerierConn, arg ListRangeParams
 		qctx = sc.Context()
 	}
 	for rows.Next() {
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
@@ -802,9 +809,9 @@ func _ListRangeEach(ctx context.Context, q CacheQuerierConn, arg ListRangeParams
 		}
 		more, err := visit(qctx, *eachRow)
 		if err != nil {
-			return err
+			return wpgx.StatementErr(qctx, err)
 		}
-		if err := wpgx.ContextErr(qctx); err != nil {
+		if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil {
 			return err
 		}
 		if !more {
@@ -812,10 +819,11 @@ func _ListRangeEach(ctx context.Context, q CacheQuerierConn, arg ListRangeParams
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err. Closing ends
-	// the statement context, so only the caller's context is checked after.
+	// successful early stop. It must run before checking Err. StatementErr
+	// also reports a database timeout that expired while reading or draining
+	// buffered rows, but not the cancellation that closing causes.
 	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := wpgx.StatementErr(qctx, rows.Err()); err != nil {
 		return err
 	}
 	return ctx.Err()
