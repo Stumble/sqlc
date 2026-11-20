@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
+	"github.com/stumble/wpgx"
 )
 
 const getRevenue = `-- name: GetRevenue :one
@@ -33,8 +34,7 @@ func (q *ReadOnlyQueries) GetRevenue(ctx context.Context, id int64) (*BookRevenu
 }
 
 func _GetRevenue(ctx context.Context, q CacheQuerierConn, id int64) (*BookRevenue, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*250)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "revenues.GetRevenue", time.Millisecond*250)
 	q.GetConn().CountIntent("revenues.GetRevenue")
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 60000)

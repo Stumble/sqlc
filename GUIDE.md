@@ -389,6 +389,23 @@ ERROR: orders/GetOrderByID does not have a timeout option
 ERROR: *pkg*/*name* does not have a timeout option
 ```
 
+The `timeout` is the query's database timeout: it bounds how long the query
+holds a database connection, not how long it waits for one. Generated code
+passes it to `wpgx.WithDBTimeout`, so it requires a wpgx release with that
+function. At run time:
+
+- On a pool connection the query first waits for a connection, at most the
+  larger of `timeout` and the pool's `AcquireTimeout` (wpgx default 2s).
+- The `timeout` starts once the query has a connection, or at the call inside a
+  transaction, and covers reading its rows (an `each` visitor included).
+- Cache lookups are bounded by the Redis client's own timeouts.
+- The caller's context deadline and cancellation always apply.
+
+Errors match `wpgx.ErrAcquireTimeout` or `wpgx.ErrDBTimeout`, and
+`context.DeadlineExceeded`. Before this release the `timeout` started when the
+method was called and also covered the cache lookup and the wait for a
+connection.
+
 Here is an example of listing all books of a category, with using id
 as the cursor for pagination.
 
@@ -471,9 +488,10 @@ the original `Querier` method set stays the same. `each: false` disables a
 companion. The new annotation requires a generator release supporting it.
 
 The consumer is synchronous, holds the connection, and runs under the query
-context/deadline. It must respect that context and cannot reenter the same
-active transaction connection. Normal stop, error and panic close/drain rows
-before the query's own context is cancelled. A drain failure after normal stop
+context, which carries the database timeout once the query has a connection.
+It must respect that context and cannot reenter the same active transaction
+connection. Normal stop, error and panic close/drain rows before the query's
+own context is cancelled. A drain failure after normal stop
 is returned; a prior callback/scan error remains primary. Panic propagates after
 cleanup. To stop receiving remaining data, cancel a caller-created context
 scoped to this query. Explicit cancellation or timeout may close the physical
@@ -906,7 +924,9 @@ The code of wpgx is very simple, the best way to understand it is to read its so
 
 + {appName}_wpgx_conn_pool{name="max_conns/total_conns/...."}: connection pool gauges.
 + {appName}_wpgx_request_total{name="$queryName"}: number of DB hits for each query.
-+ {appName}_wpgx_latency_milliseconds{name="$queryName"}: histogram of SQL execution duration.
++ {appName}_wpgx_latency_milliseconds{name="$queryName"}: histogram of the whole call, including the wait for a connection.
++ wpgx_acquire_wait_milliseconds, wpgx_db_latency_milliseconds and wpgx_timeout_total split
+  the wait for a connection from database time; see the wpgx README.
 
 ### Open Telemetry
 

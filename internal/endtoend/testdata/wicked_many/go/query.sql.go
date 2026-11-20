@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/stumble/wpgx"
 )
 
 const deleteAndList = `-- name: DeleteAndList :many
@@ -37,8 +38,7 @@ func (q *ReadOnlyQueries) DeleteAndList(ctx context.Context, beforeID int64) ([]
 }
 
 func _DeleteAndList(ctx context.Context, q CacheQuerierConn, beforeID int64) ([]DeleteAndListRow, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "manycompat.DeleteAndList", time.Millisecond*1000)
 	q.GetConn().CountIntent("manycompat.DeleteAndList")
 	rows, err := q.GetConn().WQuery(qctx, "manycompat.DeleteAndList", deleteAndList, beforeID)
 	if err != nil {
@@ -74,8 +74,7 @@ func (q *ReadOnlyQueries) ListBooks(ctx context.Context, minID int64) ([]Book, e
 }
 
 func _ListBooks(ctx context.Context, q CacheQuerierConn, minID int64) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "manycompat.ListBooks", time.Millisecond*1000)
 	q.GetConn().CountIntent("manycompat.ListBooks")
 	rows, err := q.GetConn().WQuery(qctx, "manycompat.ListBooks", listBooks, minID)
 	if err != nil {
@@ -112,8 +111,7 @@ func (q *ReadOnlyQueries) ListCachedBooks(ctx context.Context) ([]Book, error) {
 }
 
 func _ListCachedBooks(ctx context.Context, q CacheQuerierConn) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "manycompat.ListCachedBooks", time.Millisecond*1000)
 	q.GetConn().CountIntent("manycompat.ListCachedBooks")
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 5000)
@@ -174,8 +172,7 @@ func (q *ReadOnlyQueries) ListCachedRange(ctx context.Context, arg ListCachedRan
 }
 
 func _ListCachedRange(ctx context.Context, q CacheQuerierConn, arg ListCachedRangeParams) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "manycompat.ListCachedRange", time.Millisecond*1000)
 	q.GetConn().CountIntent("manycompat.ListCachedRange")
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 5000)
@@ -224,8 +221,7 @@ func (q *ReadOnlyQueries) ListIDs(ctx context.Context) ([]int64, error) {
 }
 
 func _ListIDs(ctx context.Context, q CacheQuerierConn) ([]int64, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "manycompat.ListIDs", time.Millisecond*1000)
 	q.GetConn().CountIntent("manycompat.ListIDs")
 	rows, err := q.GetConn().WQuery(qctx, "manycompat.ListIDs", listIDs)
 	if err != nil {
@@ -259,8 +255,7 @@ func (q *Queries) ListPrimaryBooks(ctx context.Context) ([]Book, error) {
 }
 
 func _ListPrimaryBooks(ctx context.Context, q CacheQuerierConn) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "manycompat.ListPrimaryBooks", time.Millisecond*1000)
 	rows, err := q.GetConn().WQuery(qctx, "manycompat.ListPrimaryBooks", listPrimaryBooks)
 	if err != nil {
 		return nil, err
@@ -299,8 +294,7 @@ func (q *Queries) PutBooks(ctx context.Context, arg PutBooksParams) ([]Book, err
 }
 
 func _PutBooks(ctx context.Context, q CacheWGConn, arg PutBooksParams) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "manycompat.PutBooks", time.Millisecond*1000)
 	rows, err := q.GetConn().WQuery(qctx, "manycompat.PutBooks", putBooks, arg.ID, arg.Value)
 	if err != nil {
 		return nil, err

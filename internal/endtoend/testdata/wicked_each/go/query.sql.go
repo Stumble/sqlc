@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/stumble/wpgx"
 )
 
 const listBooks = `-- name: ListBooks :many
@@ -32,8 +33,7 @@ func (q *ReadOnlyQueries) ListBooks(ctx context.Context, visit int64) ([]Book, e
 }
 
 func _ListBooks(ctx context.Context, q CacheQuerierConn, visit int64) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListBooks", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListBooks")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListBooks", listBooks, visit)
 	if err != nil {
@@ -59,7 +59,8 @@ func _ListBooks(ctx context.Context, q CacheQuerierConn, visit int64) ([]Book, e
 // It directly queries the DB, bypassing the slice method's result cache.
 // Return true to continue or false to stop the whole read; to skip a row,
 // omit its output and return true. Errors are returned after rows are closed.
-// The query timeout covers the synchronous visitor and draining. The visitor
+// The query's database timeout starts once it has a connection and covers the
+// synchronous visitor and draining; the visitor's ctx carries it. The visitor
 // must respect ctx and must not query again on the same active connection.
 // Normal stop and visitor error drain by default; cancel a query-specific
 // caller context to abort transfer, which may invalidate its connection/tx.
@@ -76,27 +77,31 @@ func _ListBooksEach(ctx context.Context, q CacheQuerierConn, visit int64, visit1
 	if visit1 == nil {
 		return fmt.Errorf("ListBooksEach: nil visitor")
 	}
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListBooks", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListBooks")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListBooks", listBooks, visit)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	// wpgx rows carry the statement context and its database timeout.
+	vctx := qctx
+	if sc, ok := rows.(interface{ Context() context.Context }); ok {
+		vctx = sc.Context()
+	}
 	for rows.Next() {
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
 		if err := rows.Scan(&eachRow.ID, &eachRow.Value); err != nil {
 			return err
 		}
-		more, err := visit1(qctx, *eachRow)
+		more, err := visit1(vctx, *eachRow)
 		if err != nil {
 			return err
 		}
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		if !more {
@@ -104,12 +109,13 @@ func _ListBooksEach(ctx context.Context, q CacheQuerierConn, visit int64, visit1
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err and cancelling.
+	// successful early stop. It must run before checking Err. Closing ends
+	// the statement context, so only the caller's context is checked after.
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return qctx.Err()
+	return ctx.Err()
 }
 
 const listCachedBooks = `-- name: ListCachedBooks :many
@@ -128,8 +134,7 @@ func (q *ReadOnlyQueries) ListCachedBooks(ctx context.Context) ([]Book, error) {
 }
 
 func _ListCachedBooks(ctx context.Context, q CacheQuerierConn) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListCachedBooks", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListCachedBooks")
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 5000)
@@ -168,7 +173,8 @@ func _ListCachedBooks(ctx context.Context, q CacheQuerierConn) ([]Book, error) {
 // It directly queries the DB, bypassing the slice method's result cache.
 // Return true to continue or false to stop the whole read; to skip a row,
 // omit its output and return true. Errors are returned after rows are closed.
-// The query timeout covers the synchronous visitor and draining. The visitor
+// The query's database timeout starts once it has a connection and covers the
+// synchronous visitor and draining; the visitor's ctx carries it. The visitor
 // must respect ctx and must not query again on the same active connection.
 // Normal stop and visitor error drain by default; cancel a query-specific
 // caller context to abort transfer, which may invalidate its connection/tx.
@@ -185,27 +191,31 @@ func _ListCachedBooksEach(ctx context.Context, q CacheQuerierConn, visit func(co
 	if visit == nil {
 		return fmt.Errorf("ListCachedBooksEach: nil visitor")
 	}
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListCachedBooks", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListCachedBooks")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListCachedBooks", listCachedBooks)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	// wpgx rows carry the statement context and its database timeout.
+	vctx := qctx
+	if sc, ok := rows.(interface{ Context() context.Context }); ok {
+		vctx = sc.Context()
+	}
 	for rows.Next() {
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
 		if err := rows.Scan(&eachRow.ID, &eachRow.Value); err != nil {
 			return err
 		}
-		more, err := visit(qctx, *eachRow)
+		more, err := visit(vctx, *eachRow)
 		if err != nil {
 			return err
 		}
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		if !more {
@@ -213,12 +223,13 @@ func _ListCachedBooksEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err and cancelling.
+	// successful early stop. It must run before checking Err. Closing ends
+	// the statement context, so only the caller's context is checked after.
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return qctx.Err()
+	return ctx.Err()
 }
 
 const listIDs = `-- name: ListIDs :many
@@ -236,8 +247,7 @@ func (q *ReadOnlyQueries) ListIDs(ctx context.Context) ([]int64, error) {
 }
 
 func _ListIDs(ctx context.Context, q CacheQuerierConn) ([]int64, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListIDs", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListIDs")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListIDs", listIDs)
 	if err != nil {
@@ -263,7 +273,8 @@ func _ListIDs(ctx context.Context, q CacheQuerierConn) ([]int64, error) {
 // It directly queries the DB, bypassing the slice method's result cache.
 // Return true to continue or false to stop the whole read; to skip a row,
 // omit its output and return true. Errors are returned after rows are closed.
-// The query timeout covers the synchronous visitor and draining. The visitor
+// The query's database timeout starts once it has a connection and covers the
+// synchronous visitor and draining; the visitor's ctx carries it. The visitor
 // must respect ctx and must not query again on the same active connection.
 // Normal stop and visitor error drain by default; cancel a query-specific
 // caller context to abort transfer, which may invalidate its connection/tx.
@@ -280,27 +291,31 @@ func _ListIDsEach(ctx context.Context, q CacheQuerierConn, visit func(context.Co
 	if visit == nil {
 		return fmt.Errorf("ListIDsEach: nil visitor")
 	}
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListIDs", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListIDs")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListIDs", listIDs)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	// wpgx rows carry the statement context and its database timeout.
+	vctx := qctx
+	if sc, ok := rows.(interface{ Context() context.Context }); ok {
+		vctx = sc.Context()
+	}
 	for rows.Next() {
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		var eachRow *int64 = new(int64)
 		if err := rows.Scan(eachRow); err != nil {
 			return err
 		}
-		more, err := visit(qctx, *eachRow)
+		more, err := visit(vctx, *eachRow)
 		if err != nil {
 			return err
 		}
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		if !more {
@@ -308,12 +323,13 @@ func _ListIDsEach(ctx context.Context, q CacheQuerierConn, visit func(context.Co
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err and cancelling.
+	// successful early stop. It must run before checking Err. Closing ends
+	// the statement context, so only the caller's context is checked after.
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return qctx.Err()
+	return ctx.Err()
 }
 
 const listNamedScalar = `-- name: ListNamedScalar :many
@@ -331,8 +347,7 @@ func (q *ReadOnlyQueries) ListNamedScalar(ctx context.Context) ([]int64, error) 
 }
 
 func _ListNamedScalar(ctx context.Context, q CacheQuerierConn) ([]int64, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListNamedScalar", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListNamedScalar")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListNamedScalar", listNamedScalar)
 	if err != nil {
@@ -358,7 +373,8 @@ func _ListNamedScalar(ctx context.Context, q CacheQuerierConn) ([]int64, error) 
 // It directly queries the DB, bypassing the slice method's result cache.
 // Return true to continue or false to stop the whole read; to skip a row,
 // omit its output and return true. Errors are returned after rows are closed.
-// The query timeout covers the synchronous visitor and draining. The visitor
+// The query's database timeout starts once it has a connection and covers the
+// synchronous visitor and draining; the visitor's ctx carries it. The visitor
 // must respect ctx and must not query again on the same active connection.
 // Normal stop and visitor error drain by default; cancel a query-specific
 // caller context to abort transfer, which may invalidate its connection/tx.
@@ -375,27 +391,31 @@ func _ListNamedScalarEach(ctx context.Context, q CacheQuerierConn, visit func(co
 	if visit == nil {
 		return fmt.Errorf("ListNamedScalarEach: nil visitor")
 	}
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListNamedScalar", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListNamedScalar")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListNamedScalar", listNamedScalar)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	// wpgx rows carry the statement context and its database timeout.
+	vctx := qctx
+	if sc, ok := rows.(interface{ Context() context.Context }); ok {
+		vctx = sc.Context()
+	}
 	for rows.Next() {
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		var eachRow *int64 = new(int64)
 		if err := rows.Scan(eachRow); err != nil {
 			return err
 		}
-		more, err := visit(qctx, *eachRow)
+		more, err := visit(vctx, *eachRow)
 		if err != nil {
 			return err
 		}
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		if !more {
@@ -403,12 +423,13 @@ func _ListNamedScalarEach(ctx context.Context, q CacheQuerierConn, visit func(co
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err and cancelling.
+	// successful early stop. It must run before checking Err. Closing ends
+	// the statement context, so only the caller's context is checked after.
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return qctx.Err()
+	return ctx.Err()
 }
 
 const listPrimaryBooks = `-- name: ListPrimaryBooks :many
@@ -424,8 +445,7 @@ func (q *Queries) ListPrimaryBooks(ctx context.Context) ([]Book, error) {
 }
 
 func _ListPrimaryBooks(ctx context.Context, q CacheQuerierConn) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListPrimaryBooks", time.Millisecond*1000)
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListPrimaryBooks", listPrimaryBooks)
 	if err != nil {
 		return nil, err
@@ -450,7 +470,8 @@ func _ListPrimaryBooks(ctx context.Context, q CacheQuerierConn) ([]Book, error) 
 // It directly queries the DB, bypassing the slice method's result cache.
 // Return true to continue or false to stop the whole read; to skip a row,
 // omit its output and return true. Errors are returned after rows are closed.
-// The query timeout covers the synchronous visitor and draining. The visitor
+// The query's database timeout starts once it has a connection and covers the
+// synchronous visitor and draining; the visitor's ctx carries it. The visitor
 // must respect ctx and must not query again on the same active connection.
 // Normal stop and visitor error drain by default; cancel a query-specific
 // caller context to abort transfer, which may invalidate its connection/tx.
@@ -462,27 +483,31 @@ func _ListPrimaryBooksEach(ctx context.Context, q CacheQuerierConn, visit func(c
 	if visit == nil {
 		return fmt.Errorf("ListPrimaryBooksEach: nil visitor")
 	}
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListPrimaryBooks", time.Millisecond*1000)
 
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListPrimaryBooks", listPrimaryBooks)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	// wpgx rows carry the statement context and its database timeout.
+	vctx := qctx
+	if sc, ok := rows.(interface{ Context() context.Context }); ok {
+		vctx = sc.Context()
+	}
 	for rows.Next() {
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
 		if err := rows.Scan(&eachRow.ID, &eachRow.Value); err != nil {
 			return err
 		}
-		more, err := visit(qctx, *eachRow)
+		more, err := visit(vctx, *eachRow)
 		if err != nil {
 			return err
 		}
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		if !more {
@@ -490,12 +515,13 @@ func _ListPrimaryBooksEach(ctx context.Context, q CacheQuerierConn, visit func(c
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err and cancelling.
+	// successful early stop. It must run before checking Err. Closing ends
+	// the statement context, so only the caller's context is checked after.
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return qctx.Err()
+	return ctx.Err()
 }
 
 const listRange = `-- name: ListRange :many
@@ -518,8 +544,7 @@ func (q *ReadOnlyQueries) ListRange(ctx context.Context, arg ListRangeParams) ([
 }
 
 func _ListRange(ctx context.Context, q CacheQuerierConn, arg ListRangeParams) ([]Book, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListRange", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListRange")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListRange", listRange, arg.FromID, arg.ToID)
 	if err != nil {
@@ -545,7 +570,8 @@ func _ListRange(ctx context.Context, q CacheQuerierConn, arg ListRangeParams) ([
 // It directly queries the DB, bypassing the slice method's result cache.
 // Return true to continue or false to stop the whole read; to skip a row,
 // omit its output and return true. Errors are returned after rows are closed.
-// The query timeout covers the synchronous visitor and draining. The visitor
+// The query's database timeout starts once it has a connection and covers the
+// synchronous visitor and draining; the visitor's ctx carries it. The visitor
 // must respect ctx and must not query again on the same active connection.
 // Normal stop and visitor error drain by default; cancel a query-specific
 // caller context to abort transfer, which may invalidate its connection/tx.
@@ -562,27 +588,31 @@ func _ListRangeEach(ctx context.Context, q CacheQuerierConn, arg ListRangeParams
 	if visit == nil {
 		return fmt.Errorf("ListRangeEach: nil visitor")
 	}
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "eachgen.ListRange", time.Millisecond*1000)
 	q.GetConn().CountIntent("eachgen.ListRange")
 	rows, err := q.GetConn().WQuery(qctx, "eachgen.ListRange", listRange, arg.FromID, arg.ToID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	// wpgx rows carry the statement context and its database timeout.
+	vctx := qctx
+	if sc, ok := rows.(interface{ Context() context.Context }); ok {
+		vctx = sc.Context()
+	}
 	for rows.Next() {
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		var eachRow *Book = new(Book)
 		if err := rows.Scan(&eachRow.ID, &eachRow.Value); err != nil {
 			return err
 		}
-		more, err := visit(qctx, *eachRow)
+		more, err := visit(vctx, *eachRow)
 		if err != nil {
 			return err
 		}
-		if err := qctx.Err(); err != nil {
+		if err := wpgx.ContextErr(vctx); err != nil {
 			return err
 		}
 		if !more {
@@ -590,12 +620,13 @@ func _ListRangeEach(ctx context.Context, q CacheQuerierConn, arg ListRangeParams
 		}
 	}
 	// Close may drain pending results and surface a server error after a
-	// successful early stop. It must run before checking Err and cancelling.
+	// successful early stop. It must run before checking Err. Closing ends
+	// the statement context, so only the caller's context is checked after.
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return qctx.Err()
+	return ctx.Err()
 }
 
 //// auto generated functions
