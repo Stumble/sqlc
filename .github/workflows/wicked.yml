@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: Stumble/bookstore
-          ref: 2a7f7e396451821a8fe3054eb265037b830af68d
+          ref: 89b3fbc09bf274e563722c3f582f5c3ac4bca3ec
           path: bookstore
       - name: Check generated API and code
         working-directory: bookstore
