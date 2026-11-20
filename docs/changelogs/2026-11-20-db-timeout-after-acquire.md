@@ -25,13 +25,18 @@ record, Stumble/wpgx `docs/changelogs/2026-11-20-db-timeout-after-acquire.md`.
 - B2 — dcache receives the caller's context (plus the timeout value), so cache
   lookups and fills are bounded by the Redis client's timeouts, not by T.
 - B3 — Each visitors receive the statement context from wpgx rows (falling
-  back to the method context). An ended statement context is reported with
+  back to the method context; `qctx` is reassigned, so no new local name can
+  collide with a SQL parameter). An ended statement context is reported with
   `wpgx.ContextErr`: `ctx.Err()`, which also matches `wpgx.ErrDBTimeout` when
   the database timeout ended it. After closing the rows only the caller's
   context is checked.
 - B4 — Generated files import `github.com/stumble/wpgx`; regenerated code
   needs a wpgx release with `WithDBTimeout` (compile-time check).
 - F1 — Missing timeouts still fail generation.
+- F2 — A SQL parameter named `wpgx` is generated as `wpgx_` (reserved), so it
+  cannot shadow the package the method bodies now call.
+- B2 precondition: the Redis-client bound holds with dcache v0.3.0+ and Redis
+  single flight off (default); see R6 of the primary record.
 - Compatibility: regenerating changes generated code by design (owner chose
   the new semantics as the default of this minor release). Old generated code
   keeps working with new wpgx.

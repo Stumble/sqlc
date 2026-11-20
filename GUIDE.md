@@ -398,7 +398,10 @@ function. At run time:
   larger of `timeout` and the pool's `AcquireTimeout` (wpgx default 2s).
 - The `timeout` starts once the query has a connection, or at the call inside a
   transaction, and covers reading its rows (an `each` visitor included).
-- Cache lookups are bounded by the Redis client's own timeouts.
+- Cache lookups are bounded by the Redis client's own timeouts, with dcache
+  v0.3.0+ and Redis single flight off (its default). With Redis single flight,
+  an unresponsive Redis is retried until the caller's context ends, so callers
+  need a deadline.
 - The caller's context deadline and cancellation always apply.
 
 Errors match `wpgx.ErrAcquireTimeout` or `wpgx.ErrDBTimeout`, and

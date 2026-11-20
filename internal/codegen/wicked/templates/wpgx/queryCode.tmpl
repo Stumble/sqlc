@@ -259,17 +259,16 @@ func _{{.MethodName}}Each(ctx context.Context, q CacheQuerierConn, {{if .Arg.Pai
     }
     defer rows.Close()
     // wpgx rows carry the statement context and its database timeout.
-    vctx := qctx
     if sc, ok := rows.(interface{ Context() context.Context }); ok {
-        vctx = sc.Context()
+        qctx = sc.Context()
     }
     for rows.Next() {
-        if err := wpgx.ContextErr(vctx); err != nil { return err }
+        if err := wpgx.ContextErr(qctx); err != nil { return err }
         var eachRow *{{.Ret.Type}} = new({{.Ret.Type}})
         if err := rows.Scan({{.EachScan}}); err != nil { return err }
-        more, err := {{.EachVisitName}}(vctx, *eachRow)
+        more, err := {{.EachVisitName}}(qctx, *eachRow)
         if err != nil { return err }
-        if err := wpgx.ContextErr(vctx); err != nil { return err }
+        if err := wpgx.ContextErr(qctx); err != nil { return err }
         if !more { break }
     }
     // Close may drain pending results and surface a server error after a

@@ -61,6 +61,9 @@ func IsReserved(s string) bool {
 		return true
 	case "q":
 		return true
+	case "wpgx":
+		// Generated methods call the wpgx package.
+		return true
 	default:
 		return false
 	}
