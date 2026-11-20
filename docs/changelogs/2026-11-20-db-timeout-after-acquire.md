@@ -70,10 +70,10 @@ See the primary record (D1–D5, R1–R5). Local decisions:
 
 ### Serial Implementation Checklist
 
-- [ ] Templates and imports.
-- [ ] Regenerate fixtures; bump the testdata wpgx; update/add runtime tests.
-- [ ] Guide.
-- [ ] Bookstore pin after the bookstore branch is published.
+- [x] Templates and imports.
+- [x] Regenerate fixtures; bump the testdata wpgx; update/add runtime tests.
+- [x] Guide.
+- [x] Bookstore pin (commit 89b3fbc, published with this branch).
 
 ## 5. Verification and E2E Design
 
@@ -96,8 +96,29 @@ See the primary record, section 6.
 
 ## 7. Outcome and Evidence
 
-Pending.
+- Result: B1–B4 and F1–F2 as specified; generated code requires wpgx with
+  `WithDBTimeout`/`StatementErr` (pinned to the wpgx branch commit
+  `v0.5.2-0.20261120053742-4b29cac2136d` in the testdata module until tagged).
+- Deviations (reviewed): Each reassigns `qctx` instead of declaring `vctx`
+  (R1-05); `wpgx` is a reserved identifier; Each reports through
+  `wpgx.StatementErr` (R2-02). The testdata module was already not tidy at the
+  base, so only `go get` was applied.
+- Verification on the final content (`GOMAXPROCS=2`, `-p 1`):
+  - Builds: `go build -p=1 -ldflags "-X github.com/sqlc-dev/sqlc/internal/info.Version=v2.4.0-dev-wicked-fork" -o ../sqlc-new ./cmd/sqlc` and the default-label `../sqlc-fixture`; fixtures regenerated with the latter.
+  - `GOWORK=off go test -p=1 -count=1 ./internal/codegen/wicked ./internal/cmd`: pass.
+  - `GOWORK=off go test -p=1 -count=1 -run 'TestReplay/base/' ./internal/endtoend` with this repository's `sqlc-gen-json` on PATH: pass (a stale `~/go/bin/sqlc-gen-json` from another build fails `process_plugin_sqlc_gen_json` independently of this change); `-run 'TestReplay/base/wicked'`: pass.
+  - `internal/endtoend/testdata` with `GOWORK=off CGO_ENABLED=0`: `go build ./...` pass; `SQLC_EACH_TEST_DSN=postgres://…@127.0.0.1:55491/sqlc_test go test -race -count=1 ./wicked_compat/go`: pass, including `TestGeneratedTimeoutPostgres` (5 subtests) and `TestGeneratedEachPostgres`.
+  - Mutation checks: the v2.5.0 generated Each fixture fails the timeout test; reverting the two `StatementErr` lines fails both new Each regressions.
+  - Wicked CI bookstore job reproduced on a clean clone of bookstore 89b3fbc: regenerate, `sqlc diff`, no diff, build.
+- Cross-agent review: primary record section 7 (Codex session
+  `5e2002b6-dea5-4c53-96c9-cde8cdd6a84b`, rounds 1–5, final ACCEPT of
+  5291d2071 with wpgx 4b29cac and bookstore 89b3fbc). Later changes here are
+  record-only.
+- Not run locally: the full CI suite (`go test --tags=examples ./...` needs
+  MySQL and PostgreSQL services); CI runs it.
 
 ## 8. Remaining Work
 
-Pending.
+- Before merge: after wpgx is tagged and the bookstore PR merged, bump the
+  testdata wpgx pin to the tag and point `.github/workflows/wicked.yml` at the
+  merged bookstore commit; then tag a new sqlc minor.
