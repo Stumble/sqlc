@@ -30,3 +30,13 @@ SELECT id, value FROM books ORDER BY id;
 -- -- timeout: 1s
 -- -- each: true
 SELECT id, value FROM books WHERE id BETWEEN @from_id AND @to_id ORDER BY id;
+
+-- name: ListFromWpgx :many
+-- -- timeout: 1s
+-- -- each: true
+SELECT id, value FROM books WHERE id >= @wpgx ORDER BY id;
+
+-- name: ListFromVctx :many
+-- -- timeout: 1s
+-- -- each: true
+SELECT id, value FROM books WHERE id >= @vctx ORDER BY id;

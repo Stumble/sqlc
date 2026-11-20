@@ -133,3 +133,14 @@ func TestEachVisitorNames(t *testing.T) {
 		}
 	}
 }
+
+func TestGeneratedPackageNamesAreReserved(t *testing.T) {
+	// Generated method bodies call the wpgx package, so a parameter must not
+	// shadow it.
+	if got := escape("wpgx"); got != "wpgx_" {
+		t.Fatalf("escape(wpgx)=%s", got)
+	}
+	if got := escape("vctx"); got != "vctx" {
+		t.Fatalf("escape(vctx)=%s", got)
+	}
+}
