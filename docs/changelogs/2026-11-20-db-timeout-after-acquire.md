@@ -97,8 +97,9 @@ See the primary record, section 6.
 ## 7. Outcome and Evidence
 
 - Result: B1–B4 and F1–F2 as specified; generated code requires wpgx with
-  `WithDBTimeout`/`StatementErr` (pinned to the wpgx branch commit
-  `v0.5.2-0.20261120053742-4b29cac2136d` in the testdata module until tagged).
+  `WithDBTimeout`/`StatementErr` (wpgx v0.6.0 in the testdata module; the
+  reviewed content pinned the same code as
+  `v0.5.2-0.20261120053742-4b29cac2136d`).
 - Deviations (reviewed): Each reassigns `qctx` instead of declaring `vctx`
   (R1-05); `wpgx` is a reserved identifier; Each reports through
   `wpgx.StatementErr` (R2-02). The testdata module was already not tidy at the
@@ -117,8 +118,20 @@ See the primary record, section 6.
 - Not run locally: the full CI suite (`go test --tags=examples ./...` needs
   MySQL and PostgreSQL services); CI runs it.
 
+- Release follow-up (2026-11-22 US Pacific): this change merged as
+  `be5161e1b` and is released as v2.6.0. The testdata module pins wpgx v0.6.0
+  (merged Stumble/wpgx `3673ea0`, same tree as the reviewed head) and
+  `.github/workflows/wicked.yml` checks out the merged Stumble/bookstore#3
+  commit. `CGO_ENABLED=0 go build ./...` and
+  `go test -race -count=1 ./wicked_compat/go` with `SQLC_EACH_TEST_DSN`
+  (including `TestGeneratedTimeoutPostgres`) pass on the testdata module.
+- Release review: Codex session `5e2002b6-dea5-4c53-96c9-cde8cdd6a84b`
+  round 6 (report sha256 `8327bcb40c4bc31c08dc74a4a08869602072805451e238ae791dcd31ef729341`)
+  ACCEPTed bookstore `7b9adb1` and this follow-up at `e6b2d91ff`, and the rule
+  for the `wicked.yml` ref. Stumble/bookstore#3 merged as `c886634` with tree
+  `22d4b62`, equal to the tree of the accepted `7b9adb1`.
+
 ## 8. Remaining Work
 
-- Before merge: after wpgx is tagged and the bookstore PR merged, bump the
-  testdata wpgx pin to the tag and point `.github/workflows/wicked.yml` at the
-  merged bookstore commit; then tag a new sqlc minor.
+- None in this repository. Consumers adopt the timeout semantics by
+  regenerating with v2.6.0 and requiring wpgx v0.6.0.
