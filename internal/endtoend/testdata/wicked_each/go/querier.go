@@ -13,6 +13,10 @@ type Querier interface {
 
 	ListCachedBooks(ctx context.Context) ([]Book, error)
 
+	ListFromVctx(ctx context.Context, vctx int64) ([]Book, error)
+
+	ListFromWpgx(ctx context.Context, wpgx_ int64) ([]Book, error)
+
 	ListIDs(ctx context.Context) ([]int64, error)
 
 	ListNamedScalar(ctx context.Context) ([]int64, error)
@@ -29,6 +33,10 @@ type EachQuerier interface {
 	ListBooksEach(ctx context.Context, visit int64, visit1 func(context.Context, Book) (more bool, err error)) error
 
 	ListCachedBooksEach(ctx context.Context, visit func(context.Context, Book) (more bool, err error)) error
+
+	ListFromVctxEach(ctx context.Context, vctx int64, visit func(context.Context, Book) (more bool, err error)) error
+
+	ListFromWpgxEach(ctx context.Context, wpgx_ int64, visit func(context.Context, Book) (more bool, err error)) error
 
 	ListIDsEach(ctx context.Context, visit func(context.Context, int64) (more bool, err error)) error
 

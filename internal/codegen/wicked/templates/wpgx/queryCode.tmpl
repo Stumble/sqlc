@@ -48,8 +48,7 @@ func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) (*
 
 func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}) (*{{.Ret.Type}}, error) {
 {{- if gt .Option.Timeout.Milliseconds 0 }}
-    qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
-    defer cancel()
+    qctx := wpgx.WithDBTimeout(ctx, "{{.UniqueLabel}}", time.Millisecond * {{.Option.Timeout.Milliseconds}})
 {{- end}}
 {{- if .CountIntent }}
     q.GetConn().CountIntent("{{.UniqueLabel}}")
@@ -138,8 +137,7 @@ func (q *ReadOnlyQueries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}}) ([
 
 func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.InvalidateArgs}}) ([]{{.Ret.Type}}, error) {
 {{- if gt .Option.Timeout.Milliseconds 0 }}
-    qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
-    defer cancel()
+    qctx := wpgx.WithDBTimeout(ctx, "{{.UniqueLabel}}", time.Millisecond * {{.Option.Timeout.Milliseconds}})
 {{- end}}
 {{- if .CountIntent }}
     q.GetConn().CountIntent("{{.UniqueLabel}}")
@@ -233,7 +231,8 @@ func _{{.MethodName}}(ctx context.Context, q {{.ConnType}}, {{.Arg.Pair}} {{.Inv
 // It directly queries the DB, bypassing the slice method's result cache.
 // Return true to continue or false to stop the whole read; to skip a row,
 // omit its output and return true. Errors are returned after rows are closed.
-// The query timeout covers the synchronous visitor and draining. The visitor
+// The query's database timeout starts once it has a connection and covers the
+// synchronous visitor and draining; the visitor's ctx carries it. The visitor
 // must respect ctx and must not query again on the same active connection.
 // Normal stop and visitor error drain by default; cancel a query-specific
 // caller context to abort transfer, which may invalidate its connection/tx.
@@ -252,28 +251,33 @@ func _{{.MethodName}}Each(ctx context.Context, q CacheQuerierConn, {{if .Arg.Pai
     if {{.EachVisitName}} == nil {
         return fmt.Errorf("{{.MethodName}}Each: nil visitor")
     }
-    qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
-    defer cancel()
+    qctx := wpgx.WithDBTimeout(ctx, "{{.UniqueLabel}}", time.Millisecond * {{.Option.Timeout.Milliseconds}})
     {{if .CountIntent}}q.GetConn().CountIntent("{{.UniqueLabel}}"){{end}}
     rows, err := q.GetConn().WQuery(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
         return err
     }
     defer rows.Close()
+    // wpgx rows carry the statement context and its database timeout.
+    if sc, ok := rows.(interface{ Context() context.Context }); ok {
+        qctx = sc.Context()
+    }
     for rows.Next() {
-        if err := qctx.Err(); err != nil { return err }
+        if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil { return err }
         var eachRow *{{.Ret.Type}} = new({{.Ret.Type}})
         if err := rows.Scan({{.EachScan}}); err != nil { return err }
         more, err := {{.EachVisitName}}(qctx, *eachRow)
-        if err != nil { return err }
-        if err := qctx.Err(); err != nil { return err }
+        if err != nil { return wpgx.StatementErr(qctx, err) }
+        if err := wpgx.StatementErr(qctx, qctx.Err()); err != nil { return err }
         if !more { break }
     }
     // Close may drain pending results and surface a server error after a
-    // successful early stop. It must run before checking Err and cancelling.
+    // successful early stop. It must run before checking Err. StatementErr
+    // also reports a database timeout that expired while reading or draining
+    // buffered rows, but not the cancellation that closing causes.
     rows.Close()
-    if err := rows.Err(); err != nil { return err }
-    return qctx.Err()
+    if err := wpgx.StatementErr(qctx, rows.Err()); err != nil { return err }
+    return ctx.Err()
 }
 {{end}}
 {{end}}
@@ -283,8 +287,7 @@ func _{{.MethodName}}Each(ctx context.Context, q CacheQuerierConn, {{if .Arg.Pai
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) error {
 {{- if gt .Option.Timeout.Milliseconds 0 }}
-    qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
-    defer cancel()
+    qctx := wpgx.WithDBTimeout(ctx, "{{.UniqueLabel}}", time.Millisecond * {{.Option.Timeout.Milliseconds}})
 {{- end}}
     _, err := q.db.WExec(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
@@ -331,8 +334,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (int64, error) {
 {{- if gt .Option.Timeout.Milliseconds 0 }}
-    qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
-    defer cancel()
+    qctx := wpgx.WithDBTimeout(ctx, "{{.UniqueLabel}}", time.Millisecond * {{.Option.Timeout.Milliseconds}})
 {{- end}}
     result, err := q.db.WExec(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {
@@ -379,8 +381,7 @@ func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.Invalida
 {{end -}}
 func (q *Queries) {{.MethodName}}(ctx context.Context, {{.Arg.Pair}} {{.InvalidateArgs}}) (pgconn.CommandTag, error) {
 {{- if gt .Option.Timeout.Milliseconds 0 }}
-    qctx, cancel := context.WithTimeout(ctx, time.Millisecond * {{.Option.Timeout.Milliseconds}})
-    defer cancel()
+    qctx := wpgx.WithDBTimeout(ctx, "{{.UniqueLabel}}", time.Millisecond * {{.Option.Timeout.Milliseconds}})
 {{- end}}
     rv, err := q.db.WExec(qctx, "{{.UniqueLabel}}", {{.ConstantName}}, {{.Arg.Params}})
     if err != nil {

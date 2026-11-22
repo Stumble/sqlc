@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
+	"github.com/stumble/wpgx"
 )
 
 const createRecord = `-- name: CreateRecord :exec
@@ -41,8 +42,7 @@ type CreateRecordRow struct {
 // -- timeout: 1s
 // -- invalidate: [GetRecord]
 func (q *Queries) CreateRecord(ctx context.Context, arg CreateRecordParams, getRecord *int64) error {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "compat.CreateRecord", time.Millisecond*1000)
 	_, err := q.db.WExec(qctx, "compat.CreateRecord", createRecord,
 		arg.ID,
 		arg.ExternalID,
@@ -94,8 +94,7 @@ func (q *ReadOnlyQueries) GetRecord(ctx context.Context, id int64) (*Record, err
 }
 
 func _GetRecord(ctx context.Context, q CacheQuerierConn, id int64) (*Record, error) {
-	qctx, cancel := context.WithTimeout(ctx, time.Millisecond*1000)
-	defer cancel()
+	qctx := wpgx.WithDBTimeout(ctx, "compat.GetRecord", time.Millisecond*1000)
 	q.GetConn().CountIntent("compat.GetRecord")
 	dbRead := func() (any, time.Duration, error) {
 		cacheDuration := time.Duration(time.Millisecond * 60000)

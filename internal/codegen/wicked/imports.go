@@ -393,6 +393,8 @@ func (i *importer) queryImports(filename string) fileImports {
 		}
 	}
 	pkg[ImportSpec{Path: "github.com/rs/zerolog/log"}] = struct{}{}
+	// Generated methods pass their timeout to wpgx.WithDBTimeout.
+	pkg[ImportSpec{Path: "github.com/stumble/wpgx"}] = struct{}{}
 	return sortedImports(std, pkg)
 }
 
@@ -421,6 +423,7 @@ func (i *importer) copyfromImports() fileImports {
 
 	std["context"] = struct{}{}
 	std["time"] = struct{}{}
+	pkg[ImportSpec{Path: "github.com/stumble/wpgx"}] = struct{}{}
 	if i.Options.SqlDriver == opts.SQLDriverGoSQLDriverMySQL {
 		std["io"] = struct{}{}
 		std["fmt"] = struct{}{}

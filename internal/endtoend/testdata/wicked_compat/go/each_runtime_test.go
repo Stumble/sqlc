@@ -22,9 +22,16 @@ type eachRows struct {
 	closed                                 bool
 	closeCanceled                          bool
 	ctx                                    context.Context
+	cancel                                 context.CancelFunc
 	scanErr, sourceErr, closeErr, finalErr error
 	failAfter                              int
 }
+
+// stmtEachRows are rows like wpgx returns under a database timeout: they carry
+// the statement context, which closing the rows cancels.
+type stmtEachRows struct{ *eachRows }
+
+func (r stmtEachRows) Context() context.Context { return r.ctx }
 
 func (r *eachRows) Close() {
 	if r.closed {
@@ -37,6 +44,9 @@ func (r *eachRows) Close() {
 	}
 	if r.finalErr == nil {
 		r.finalErr = r.ctx.Err()
+	}
+	if r.cancel != nil {
+		r.cancel()
 	}
 }
 func (r *eachRows) Err() error { return r.finalErr }
@@ -75,7 +85,10 @@ func (*eachRows) Conn() *pgx.Conn                              { return nil }
 func (*eachRows) TypeMap() *pgtype.Map                         { return nil }
 
 type eachConn struct {
-	rows     *eachRows
+	rows *eachRows
+	// statementTimeout makes WQuery return stmtEachRows whose context has this
+	// timeout; zero returns plain rows.
+	statementTimeout time.Duration
 	calls    int
 	intents  []string
 	name     string
@@ -93,6 +106,10 @@ func (c *eachConn) WQuery(ctx context.Context, name, sql string, args ...any) (p
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if c.statementTimeout > 0 {
+		c.rows.ctx, c.rows.cancel = context.WithTimeout(ctx, c.statementTimeout)
+		return stmtEachRows{c.rows}, nil
+	}
 	return c.rows, nil
 }
 func (*eachConn) WQueryRow(context.Context, string, string, ...any) pgx.Row {
@@ -108,7 +125,7 @@ func (*eachConn) WCopyFrom(context.Context, string, pgx.Identifier, []string, pg
 func (*eachConn) PostExec(func() error) error { panic("unexpected PostExec") }
 
 func newEachConn() *eachConn {
-	return &eachConn{rows: &eachRows{data: []eachgen.Book{
+	return &eachConn{statementTimeout: time.Minute, rows: &eachRows{data: []eachgen.Book{
 		{ID: 1, Value: []byte("one")},
 		{ID: 2, Value: []byte("two")},
 		{ID: 3, Value: []byte("three")},
@@ -124,7 +141,7 @@ func TestGeneratedEachVisitsAndOwnsLifecycle(t *testing.T) {
 			var visitCtx context.Context
 			visit := func(ctx context.Context, row eachgen.Book) (bool, error) {
 				if _, ok := ctx.Deadline(); !ok {
-					t.Fatal("visitor lacks query deadline")
+					t.Fatal("visitor lacks the statement deadline")
 				}
 				visitCtx = ctx
 				got = append(got, row)
@@ -145,8 +162,11 @@ func TestGeneratedEachVisitsAndOwnsLifecycle(t *testing.T) {
 			if !conn.rows.closed || conn.rows.closeCanceled {
 				t.Fatal("rows were not drained before cancellation")
 			}
+			if visitCtx != conn.rows.ctx {
+				t.Fatal("visitor did not receive the statement context")
+			}
 			if visitCtx.Err() != context.Canceled {
-				t.Fatal("query context outlived Each")
+				t.Fatal("statement context outlived Each")
 			}
 			if conn.calls != 1 || !reflect.DeepEqual(conn.intents, []string{"eachgen.ListBooks"}) || !reflect.DeepEqual(conn.args, []any{int64(1)}) {
 				t.Fatalf("calls=%d intents=%v args=%v", conn.calls, conn.intents, conn.args)
@@ -195,6 +215,43 @@ func TestGeneratedEachStopAndErrors(t *testing.T) {
 				t.Fatal("ordinary errors must drain before own cancellation")
 			}
 		})
+	}
+}
+
+func TestGeneratedEachWithoutStatementContext(t *testing.T) {
+	conn := newEachConn()
+	conn.statementTimeout = 0
+	ctx := context.WithValue(context.Background(), struct{}{}, "caller")
+	visits := 0
+	err := eachgen.New(conn, nil).ListBooksEach(ctx, 0, func(vctx context.Context, row eachgen.Book) (bool, error) {
+		visits++
+		if vctx.Value(struct{}{}) != "caller" {
+			t.Fatal("visitor lost the caller context")
+		}
+		if _, ok := vctx.Deadline(); ok {
+			t.Fatal("generated code must not start its own deadline")
+		}
+		return true, nil
+	})
+	if err != nil || visits != 3 || !conn.rows.closed {
+		t.Fatalf("err=%v visits=%d closed=%v", err, visits, conn.rows.closed)
+	}
+}
+
+func TestGeneratedEachStatementDeadline(t *testing.T) {
+	conn := newEachConn()
+	conn.statementTimeout = 10 * time.Millisecond
+	visits := 0
+	err := eachgen.New(conn, nil).ListBooksEach(context.Background(), 0, func(ctx context.Context, row eachgen.Book) (bool, error) {
+		visits++
+		<-ctx.Done()
+		return true, nil
+	})
+	if !errors.Is(err, context.DeadlineExceeded) || visits != 1 {
+		t.Fatalf("err=%v visits=%d", err, visits)
+	}
+	if !conn.rows.closed || !conn.rows.closeCanceled {
+		t.Fatal("an expired statement must close under cancellation")
 	}
 }
 
