@@ -125,6 +125,11 @@ See the primary record, section 6.
   commit. `CGO_ENABLED=0 go build ./...` and
   `go test -race -count=1 ./wicked_compat/go` with `SQLC_EACH_TEST_DSN`
   (including `TestGeneratedTimeoutPostgres`) pass on the testdata module.
+- Release review: Codex session `5e2002b6-dea5-4c53-96c9-cde8cdd6a84b`
+  round 6 (report sha256 `8327bcb40c4bc31c08dc74a4a08869602072805451e238ae791dcd31ef729341`)
+  ACCEPTed bookstore `7b9adb1` and this follow-up at `e6b2d91ff`, and the rule
+  for the `wicked.yml` ref. Stumble/bookstore#3 merged as `c886634` with tree
+  `22d4b62`, equal to the tree of the accepted `7b9adb1`.
 
 ## 8. Remaining Work
 
