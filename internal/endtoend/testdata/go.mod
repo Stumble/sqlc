@@ -48,7 +48,7 @@ require (
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stumble/dcache v0.1.3 // indirect
-	github.com/stumble/wpgx v0.5.2-0.20261120053742-4b29cac2136d // indirect
+	github.com/stumble/wpgx v0.6.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/volatiletech/inflect v0.0.1 // indirect
